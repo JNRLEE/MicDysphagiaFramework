@@ -26,12 +26,13 @@ MicDysphagiaFramework 是一個統一的吞嚥障礙評估框架，整合了 EAT
 
 下表顯示了框架中不同模型與數據類型之間的兼容性:
 
-| 模型 \ 數據類型 | 音頻(Audio) | 頻譜圖(Spectrogram) | 特徵(Features) |
-|--------------|-----------|-----------------|------------|
-| Swin Transformer | ✅ | ✅ | ✅ |
-| FCNN | ✅ | ✅ | ✅ |
-| CNN | ✅ | ✅ | ✅ |
-| ResNet | ✅ | ✅ | ✅ |
+
+| 模型 \ 數據類型  | 音頻(Audio) | 頻譜圖(Spectrogram) | 特徵(Features) |
+| ---------------- | ----------- | ------------------- | -------------- |
+| Swin Transformer | ✅          | ✅                  | ✅             |
+| FCNN             | ✅          | ✅                  | ✅             |
+| CNN              | ✅          | ✅                  | ✅             |
+| ResNet           | ✅          | ✅                  | ✅             |
 
 框架提供自動數據適配功能，可以在不同數據類型和模型架構之間進行自動轉換，確保輸入格式正確。
 
@@ -146,25 +147,21 @@ MicDysphagiaFramework/
 1. **創建或修改配置文件**：
 
    根據您的需求修改 `config/` 目錄下的配置文件，或創建新的配置文件。
-
 2. **運行訓練**：
 
    ```bash
    python main.py --config config/example_eat10_regression.yaml
    ```
-
 3. **使用默認配置**：
 
    ```bash
    python main.py --config config/my_config.yaml --default_config config/config_schema.yaml
    ```
-
 4. **僅評估模型**：
 
    ```bash
    python main.py --config config/example_eat10_regression.yaml --eval_only --checkpoint path/to/checkpoint.pth
    ```
-
 5. **指定輸出目錄和設備**：
 
    ```bash
@@ -359,5 +356,4 @@ model:
 
 ## 致謝
 
-- 本框架整合了 EAT10Regression 和 CombinationMonitor 兩個項目的功能
-- 特別感謝所有貢獻者和使用者 
+- 本研究由台北榮民總醫院耳鼻喉頭頸醫學部與國立陽明交通大學共同參與

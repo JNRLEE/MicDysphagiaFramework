@@ -1,3 +1,5 @@
+#python scripts/run_experiments.py --config config/audio_swin_regression.yaml
+
 global:
   experiment_name: 'audio_swin_regression'
   seed: 42
