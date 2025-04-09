@@ -1,0 +1,283 @@
+# YAML 配置文件模式：定義MicDysphagiaFramework支持的配置選項
+# 此文件作為參考模板，實際使用時應複製並修改為具體的配置文件
+
+# 全局配置
+global:
+  experiment_name: 'unnamed_experiment'  # 實驗名稱
+  seed: 42                              # 隨機種子
+  debug: false                          # 是否啟用調試模式
+  device: 'auto'                        # 使用的設備：'auto', 'cpu', 'cuda', 'cuda:0', etc.
+  output_dir: 'runs/'                   # 輸出目錄
+  logging:
+    level: 'INFO'                       # 日誌級別：'DEBUG', 'INFO', 'WARNING', 'ERROR'
+    save_to_file: true                  # 是否保存日誌到文件
+    log_interval: 10                    # 每隔多少批次記錄一次訓練日誌
+
+# 數據配置
+data:
+  type:
+    type: string
+    default: 'audio'
+    description: '數據類型 (audio, spectrogram, feature)'
+  source:
+    type: object
+    properties:
+      wav_dir:
+        type: string
+        description: '音頻文件目錄'
+      spectrogram_dir:
+        type: string
+        description: '頻譜圖文件目錄'
+      feature_dir:
+        type: string
+        description: '特徵文件目錄'
+  preprocessing:
+    type: object
+    properties:
+      audio:
+        type: object
+        properties:
+          sr:
+            type: integer
+            default: 16000
+            description: '採樣率'
+          duration:
+            type: number
+            default: 5
+            description: '音頻持續時間 (秒)'
+          normalize:
+            type: boolean
+            default: true
+            description: '是否標準化音頻'
+      spectrogram:
+        type: object
+        properties:
+          method:
+            type: string
+            default: 'mel'
+            description: '頻譜圖方法 (mel, stft)'
+          n_mels:
+            type: integer
+            default: 128
+            description: 'Mel 頻率數'
+          n_fft:
+            type: integer
+            default: 1024
+            description: 'FFT 窗口大小'
+          hop_length:
+            type: integer
+            default: 512
+            description: '跳躍長度'
+          power:
+            type: number
+            default: 2.0
+            description: '功率係數'
+          save_dir:
+            type: string
+            description: '頻譜圖保存目錄'
+      features:
+        type: object
+        properties:
+          type:
+            type: string
+            default: 'mfcc'
+            description: '特徵類型 (mfcc, spectral)'
+          n_mfcc:
+            type: integer
+            default: 40
+            description: 'MFCC 係數數量'
+  filtering:
+    type: object
+    description: '數據過濾配置'
+    properties:
+      task_type:
+        type: string
+        enum: ['classification', 'regression']
+        description: "任務類型，可以是 'classification' 或 'regression'"
+      score_thresholds:
+        type: object
+        description: '評分閾值配置'
+        properties:
+          normal:
+            type: number
+            description: "正常人的分數閾值"
+          patient:
+            type: number
+            description: "病人的分數閾值"
+      class_config:
+        type: object
+        description: '類別配置 (1啟用, 0禁用)'
+        properties:
+          NoMovement:
+            type: integer
+            enum: [0, 1]
+            description: "是否啟用無動作類型"
+          DrySwallow:
+            type: integer
+            default: 1
+            description: '是否包含乾吞嚥數據'
+          Cracker:
+            type: integer
+            default: 1
+            description: '是否包含餅乾數據'
+          Jelly:
+            type: integer
+            default: 1
+            description: '是否包含果凍數據'
+          WaterDrinking:
+            type: integer
+            default: 1
+            description: '是否包含喝水數據'
+      subject_source:
+        type: object
+        description: '受試者來源配置'
+        properties:
+          normal:
+            type: object
+            properties:
+              include_N:
+                type: integer
+                default: 1
+                description: '是否包含N開頭的正常人'
+              include_P:
+                type: integer
+                default: 1
+                description: '是否包含P開頭的正常人'
+          patient:
+            type: object
+            properties:
+              include_N:
+                type: integer
+                default: 0
+                description: '是否包含N開頭的病人'
+              include_P:
+                type: integer
+                default: 1
+                description: '是否包含P開頭的病人'
+  task_type:
+    type: string
+    default: 'regression'
+    description: '任務類型 (regression, classification)'
+  splits:
+    type: object
+    properties:
+      train_ratio:
+        type: number
+        default: 0.7
+        description: '訓練集比例'
+      val_ratio:
+        type: number
+        default: 0.15
+        description: '驗證集比例'
+      test_ratio:
+        type: number
+        default: 0.15
+        description: '測試集比例'
+      split_by_patient:
+        type: boolean
+        default: true
+        description: '是否按患者ID拆分'
+      split_seed:
+        type: integer
+        default: 42
+        description: '拆分隨機種子'
+  dataloader:
+    type: object
+    properties:
+      batch_size:
+        type: integer
+        default: 32
+        description: '批次大小'
+      num_workers:
+        type: integer
+        default: 4
+        description: '工作線程數'
+      pin_memory:
+        type: boolean
+        default: true
+        description: '是否鎖定內存'
+      drop_last:
+        type: boolean
+        default: false
+        description: '是否丟棄最後一個不完整批次'
+  transforms:
+    train:                              # 訓練集數據增強
+      randomflip: true                  # 隨機翻轉
+      randomrotation: 10                # 隨機旋轉（度數）
+      randomnoise: 0.05                 # 隨機噪聲（標準差）
+    val:                                # 驗證集轉換
+      resize: [224, 224]                # 調整大小
+    test:                               # 測試集轉換
+      resize: [224, 224]                # 調整大小
+
+# 模型配置
+model:
+  framework: 'pytorch'                  # 使用的框架：'pytorch', 'tensorflow'
+  type: 'swin_transformer'              # 模型類型
+  parameters:
+    model_name: 'swin_tiny_patch4_window7_224'  # 模型名稱
+    pretrained: true                    # 是否使用預訓練權重
+    input_channels: 3                   # 輸入通道數
+    input_size: [224, 224]              # 輸入尺寸
+    num_classes: 5                      # 類別數量（回歸模式設為1）
+    dropout_rate: 0.1                   # Dropout率
+    is_classification: true             # 是否為分類模式
+  visual_prompting:
+    enabled: false                      # 是否啟用視覺提示
+    prompt_size: [16, 16]               # 視覺提示尺寸
+    prompt_dropout: 0.1                 # 視覺提示 Dropout
+  backbone:
+    freeze: false                       # 是否凍結骨幹網絡
+    unfreeze_layers: 1                  # 解凍最後幾層
+
+# 訓練配置
+training:
+  epochs: 50                            # 訓練輪數
+  early_stopping:
+    enabled: true                       # 是否啟用早停
+    patience: 10                        # 早停耐心值
+    min_delta: 0.001                    # 最小改進值
+  optimizer:
+    type: 'adamw'                       # 優化器類型：'adam', 'adamw', 'sgd'
+    learning_rate: 1.0e-4               # 學習率
+    weight_decay: 1.0e-5                # 權重衰減
+    scheduler:
+      type: 'cosine'                    # 調度器類型：'cosine', 'step', 'plateau', null
+      step_size: 10                     # 步長（適用於 'step'）
+      gamma: 0.1                        # 縮放因子（適用於 'step'）
+      patience: 5                       # 耐心值（適用於 'plateau'）
+      warmup_epochs: 5                  # 預熱輪數（適用於 'cosine'）
+  loss:
+    type: 'mse'                         # 損失類型：'mse', 'l1', 'smoothl1', 'classification', 'classification_ranking'
+    parameters:
+      ranking_weight: 0.5               # 排序損失權重
+      margin: 0.5                       # 排序損失邊際值
+      temperature: 1.0                  # 溫度參數
+    class_weights: 'auto'               # 類別權重：'auto', null, 或具體權重列表
+
+# 評估配置
+evaluation:
+  metrics:                              # 評估指標列表
+    - 'mse'                             # 均方誤差（回歸）
+    - 'mae'                             # 平均絕對誤差（回歸）
+    - 'accuracy'                        # 準確率（分類）
+    - 'f1'                              # F1 分數（分類）
+    - 'auc'                             # AUC（分類）
+    - 'confusion_matrix'                # 混淆矩陣（分類）
+  callbacks:
+    save_best: true                     # 是否保存最佳模型
+    monitor: 'val_loss'                 # 監視指標
+    save_checkpoints: true              # 是否保存檢查點
+    checkpoint_interval: 5              # 檢查點間隔（輪數）
+
+# 可視化配置
+visualization:
+  tensorboard: true                     # 是否使用 TensorBoard
+  confusion_matrix: true                # 是否繪製混淆矩陣
+  tsne:
+    enabled: true                       # 是否啟用 t-SNE 可視化
+    perplexity_values: [5, 30, 50]      # 不同 perplexity 值
+    n_components: [2, 3]                # 降維後的維度
+  save_prediction_plots: true           # 是否保存預測圖
+  save_sample_spectrograms: true        # 是否保存樣本頻譜圖
+  max_visualizations: 100               # 最大可視化樣本數 

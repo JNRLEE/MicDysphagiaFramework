@@ -1,0 +1,97 @@
+global:
+  experiment_name: 'audio_swin_classification'
+  seed: 42
+  debug: false
+  device: 'auto'
+  output_dir: 'results'
+
+data:
+  type: 'audio'
+  source:
+    wav_dir: 'tests/dataloader_test/dataset_test'
+  preprocessing:
+    audio:
+      sr: 16000
+      duration: 5
+      normalize: true
+    spectrogram:
+      method: 'mel'
+      n_mels: 128
+      n_fft: 1024
+      hop_length: 512
+      power: 2.0
+      normalized: true
+  filtering:
+    score_thresholds:
+      normal: 0  # score <= 0 為正常人
+      patient: 9  # score >= 9 為病人
+    class_config:
+      NoMovement: 1
+      DrySwallow: 1
+      Cracker: 1
+      Jelly: 1
+      WaterDrinking: 1
+    subject_source:
+      normal:
+        include_N: 1  # 包含 N 開頭的正常人
+        include_P: 1  # 包含 P 開頭的正常人
+      patient:
+        include_N: 0  # 不包含 N 開頭的病人
+        include_P: 1  # 包含 P 開頭的病人
+    task_type: 'classification'  # 分類任務
+
+  splits:
+    train_ratio: 0.7
+    val_ratio: 0.15
+    test_ratio: 0.15
+    split_by_patient: true
+    split_seed: 42
+  dataloader:
+    batch_size: 16
+    num_workers: 2
+    pin_memory: true
+    drop_last: false
+
+model:
+  type: 'swin_transformer'
+  parameters:
+    model_name: 'swin_tiny_patch4_window7_224'
+    pretrained: true
+    num_classes: 10  # 10個分類（5種動作 x 2種患者類型）
+    input_channels: 3
+    input_size: [224, 224]
+    dropout_rate: 0.2
+    is_classification: true  # 分類任務
+  backbone:
+    freeze: false
+    unfreeze_layers: 2
+  visual_prompting:
+    enabled: false
+
+training:
+  epochs: 50
+  save_every: 10
+  early_stopping:
+    enabled: true
+    patience: 10
+    min_delta: 0.001
+  loss:
+    type: 'CrossEntropyLoss'  # 分類損失
+    parameters:
+      reduction: 'mean'
+  optimizer:
+    type: 'Adam'
+    parameters:
+      lr: 0.001
+      weight_decay: 0.0001
+  scheduler:
+    type: 'ReduceLROnPlateau'
+    parameters:
+      mode: 'min'
+      factor: 0.5
+      patience: 5
+
+evaluation:
+  metrics: ['accuracy', 'f1_score', 'precision', 'recall']
+  log_predictions: true
+  confusion_matrix: true 

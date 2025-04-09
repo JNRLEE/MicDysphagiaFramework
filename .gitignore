@@ -1,0 +1,34 @@
+# 忽略資料集目錄
+data/
+
+# 忽略虛擬環境
+.venv/
+venv/
+env/
+
+# 忽略Python編譯文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 忽略日誌文件
+*.log
+
+# 忽略編輯器和IDE文件
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# 忽略輸出和結果檔案
+outputs/
+results/
+
+# 忽略Jupyter Notebook檔案
+.ipynb_checkpoints
+
+# 忽略Cursor編輯器文件
+.cursor/ 
