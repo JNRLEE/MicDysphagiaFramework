@@ -1,0 +1,47 @@
+# 根據.gitignore生成的.dockerignore
+
+# 忽略資料集目錄
+data/
+# 但保留資料集目錄結構(如果有必要，可在執行容器時掛載數據)
+
+# 忽略虛擬環境
+.venv/
+venv/
+env/
+
+# 忽略Python編譯文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 忽略日誌文件
+*.log
+
+# 忽略編輯器和IDE文件
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+.cursor/
+
+# 忽略輸出和結果檔案
+outputs/
+results/
+
+# 忽略Jupyter Notebook檔案
+.ipynb_checkpoints
+
+# 忽略Git相關文件
+.git/
+.gitignore
+
+# 忽略Docker相關文件
+.dockerignore
+Dockerfile
+
+# 忽略README和文檔文件（可選，看實際需求）
+# README.md
+# docs/ 

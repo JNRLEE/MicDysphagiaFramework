@@ -55,11 +55,16 @@ training:
     enabled: true
     patience: 10
     min_delta: 0.001
-  # 1. 標準損失函數配置
   loss:
-    type: 'MSELoss'  # （適用於回歸任務）
+    type: 'ApproxNDCGLoss'
     parameters:
-      reduction: 'mean'
+      temperature: 0.1
+      k: 5
+  # 1. 標準損失函數配置
+  # loss:
+  #   type: 'MSELoss'  # （適用於回歸任務）
+  #   parameters:
+  #     reduction: 'mean'
   
   # loss:
   #   type: 'CrossEntropyLoss'  # （適用於分類任務）
