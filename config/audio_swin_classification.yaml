@@ -1,3 +1,5 @@
+#python scripts/run_experiments.py --config config/audio_swin_classification.yaml
+
 global:
   experiment_name: 'audio_swin_classification'
   seed: 42
@@ -75,10 +77,64 @@ training:
     enabled: true
     patience: 10
     min_delta: 0.001
-  loss:
-    type: 'CrossEntropyLoss'  # 分類損失
-    parameters:
-      reduction: 'mean'
+
+  # 損失函數設置 (選擇其中一種配置方式)
+  
+  # 1. 標準損失函數配置
+  # loss:
+  #   type: 'MSELoss'  # （適用於回歸任務）
+  #   parameters:
+  #     reduction: 'mean'
+  
+  # loss:
+  #   type: 'CrossEntropyLoss'  # （適用於分類任務）
+  #   parameters:
+  #     reduction: 'mean'
+  
+  # 2. 排序損失函數配置
+  
+  # 2.1 成對排序損失 (Pairwise)
+  # loss:
+  #   type: 'PairwiseRankingLoss'（適用於分類任務）
+  #   parameters:
+  #     margin: 0.3
+  #     sampling_ratio: 0.25
+  #     sampling_strategy: 'score_diff'  # 可選: 'random', 'score_diff', 'hard_negative'
+  #     use_exp: false
+  
+  # 2.2 列表排序損失 (Listwise)
+  # loss:
+  #   type: 'ListwiseRankingLoss'（適用於分類任務）
+  #   parameters:
+  #     method: 'listnet'  # 可選: 'listnet', 'listmle', 'approxndcg'
+  #     temperature: 1.0
+  #     k: 10
+  #     group_size: 8  # 如果>0，將batch分成group_size的子批次
+  #     stochastic: true
+  
+  # 2.3 LambdaRank損失
+  # loss:
+  #   type: 'LambdaRankLoss'  # （適用於分類任務）
+  #   parameters:
+  #     sigma: 1.0
+  #     k: 10
+  #     sampling_ratio: 0.3
+  
+  # 3. 加權損失函數
+  # loss:
+  #   type: 'WeightedMSELoss'（適用於回歸任務）
+  #   parameters:
+  #     reduction: 'mean'
+  
+  # 4. 焦點損失
+  # loss:
+  #   type: 'FocalLoss'（適用於分類任務）
+  #   parameters:
+  #     alpha: 0.25
+  #     gamma: 2.0
+  #     reduction: 'mean'
+
+
   optimizer:
     type: 'Adam'
     parameters:

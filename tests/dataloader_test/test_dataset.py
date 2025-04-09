@@ -18,10 +18,14 @@ logging.basicConfig(level=logging.INFO,
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# 添加項目根目錄到Python路徑
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, project_root)
+
 # 導入數據集類
-from MicDysphagiaFramework.data.audio_dataset import AudioDataset
-from MicDysphagiaFramework.data.feature_dataset import FeatureDataset
-from MicDysphagiaFramework.data.spectrogram_dataset import SpectrogramDataset
+from data.audio_dataset import AudioDataset
+from data.feature_dataset import FeatureDataset
+from data.spectrogram_dataset import SpectrogramDataset
 
 def create_test_config() -> Dict[str, Any]:
     """創建測試配置
@@ -181,8 +185,7 @@ def main():
         data_path = sys.argv[1]
     else:
         # 默認數據路徑
-        data_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
-                               "WavData", "test")
+        data_path = "/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/MicDysphagiaFramework/tests/dataloader_test/dataset_test"
     
     logger.info(f"使用數據路徑: {data_path}")
     

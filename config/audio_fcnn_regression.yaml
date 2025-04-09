@@ -1,20 +1,37 @@
+#python scripts/run_experiments.py --config config/audio_fcnn_regression.yaml
+
 global:
-  experiment_name: 'feature_fcnn_combined'
+  experiment_name: 'audio_fcnn_regression'
   seed: 42
   debug: false
   device: 'auto'
   output_dir: 'results'
 
 data:
-  type: 'feature'
+  type: 'audio'
   source:
-    feature_dir: 'tests/dataloader_test/dataset_test'
-    feature_extension: 'npz'
+    wav_dir: 'tests/dataloader_test/dataset_test'
   preprocessing:
-    features:
+    audio:
+      sr: 16000
+      duration: 5
       normalize: true
-      pca: false
-      pca_components: 64
+    spectrogram:
+      method: 'mel'
+      n_mels: 128
+      n_fft: 1024
+      hop_length: 512
+      power: 2.0
+      normalized: true
+  filtering:
+    task_type: 'regression'  # 回歸任務
+    class_config:  # 只用於過濾不需要的動作類型
+      NoMovement: 1
+      DrySwallow: 1
+      Cracker: 1
+      Jelly: 1
+      WaterDrinking: 1
+
   splits:
     train_ratio: 0.7
     val_ratio: 0.15
@@ -43,25 +60,16 @@ training:
   save_every: 10
   early_stopping:
     enabled: true
-    patience: 8
+    patience: 10
     min_delta: 0.001
   loss:
-    combined:
-      mse:
-        type: 'MSELoss'
-        weight: 0.6
-        parameters:
-          reduction: 'mean'
-      ranking:
-        type: 'ListMLELoss'
-        weight: 0.4
-        parameters:
-          batch_size_per_group: 8
-          temperature: 1.0
+    type: 'MSELoss'  # 回歸損失
+    parameters:
+      reduction: 'mean'
   optimizer:
     type: 'Adam'
     parameters:
-      lr: 0.0005
+      lr: 0.001
       weight_decay: 0.0001
   scheduler:
     type: 'ReduceLROnPlateau'
@@ -69,10 +77,7 @@ training:
       mode: 'min'
       factor: 0.5
       patience: 5
-      min_lr: 0.00001
 
 evaluation:
-  metrics: ['mse', 'mae', 'ndcg', 'r2_score']
-  ndcg_k: 5
-  log_predictions: true
-  feature_importance: true 
+  metrics: ['mse', 'mae', 'r2']  # 回歸評估指標
+  log_predictions: true 
