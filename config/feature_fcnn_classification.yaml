@@ -1,0 +1,102 @@
+#python scripts/run_experiments.py --config config/feature_fcnn_classification.yaml
+
+global:
+  experiment_name: 'feature_fcnn_combined'
+  seed: 42
+  debug: false
+  device: 'auto'
+  output_dir: 'results'
+
+data:
+  type: 'feature'
+  source:
+    feature_dir: 'tests/dataloader_test/dataset_test'
+    feature_extension: 'npz'
+  preprocessing:
+    features:
+      normalize: true
+      pca: false
+      pca_components: 64
+  splits:
+    train_ratio: 0.7
+    val_ratio: 0.15
+    test_ratio: 0.15
+    split_by_patient: true
+    split_seed: 42
+  dataloader:
+    batch_size: 16
+    num_workers: 2
+    pin_memory: true
+    drop_last: false
+  filtering:
+    score_thresholds:
+      normal: 0  # score <= 0 為正常人
+      patient: 9  # score >= 9 為病人
+    class_config:
+      NoMovement: 1
+      DrySwallow: 1
+      Cracker: 1
+      Jelly: 1
+      WaterDrinking: 1
+    subject_source:
+      normal:
+        include_N: 1  # 包含 N 開頭的正常人
+        include_P: 1  # 包含 P 開頭的正常人
+      patient:
+        include_N: 0  # 不包含 N 開頭的病人
+        include_P: 1  # 包含 P 開頭的病人
+    task_type: 'classification'  # 分類任務
+
+model:
+  type: 'fcnn'
+  parameters:
+    input_dim: 1024
+    hidden_layers: [512, 256, 128]
+    num_classes: 1
+    dropout_rate: 0.3
+    activation: 'relu'
+    is_classification: false
+    batch_norm: true
+
+training:
+  epochs: 50
+  save_every: 10
+  early_stopping:
+    enabled: true
+    patience: 8
+    min_delta: 0.001
+  loss:
+    type: 'CrossEntropyLoss'  # （適用於分類任務）
+    parameters:
+      reduction: 'mean'
+  # loss:
+  #   combined:
+  #     mse:
+  #       type: 'MSELoss'
+  #       weight: 0.6
+  #       parameters:
+  #         reduction: 'mean'
+  #     ranking:
+  #       type: 'ListMLELoss'
+  #       weight: 0.4
+  #       parameters:
+  #         batch_size_per_group: 8
+  #         temperature: 1.0
+  optimizer:
+    type: 'Adam'
+    parameters:
+      lr: 0.0005
+      weight_decay: 0.0001
+  scheduler:
+    type: 'ReduceLROnPlateau'
+    parameters:
+      mode: 'min'
+      factor: 0.5
+      patience: 5
+      min_lr: 0.00001
+
+evaluation:
+  metrics: ['mse', 'mae', 'ndcg', 'r2_score']
+  ndcg_k: 5
+  log_predictions: true
+  feature_importance: true 

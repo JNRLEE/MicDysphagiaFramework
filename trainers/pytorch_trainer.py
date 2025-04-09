@@ -169,11 +169,11 @@ class PyTorchTrainer:
         
         # 保存訓練歷史
         history = {
-            'train_loss': self.train_losses,
-            'val_loss': self.val_losses,
-            'metrics': self.metrics,
-            'best_val_loss': self.best_val_loss,
-            'training_time': elapsed_time
+            'train_loss': [float(loss) for loss in self.train_losses],
+            'val_loss': [float(loss) for loss in self.val_losses],
+            'metrics': {k: [{mk: float(mv) for mk, mv in m.items()} for m in v] for k, v in self.metrics.items()},
+            'best_val_loss': float(self.best_val_loss),
+            'training_time': float(elapsed_time)
         }
         
         with open(os.path.join(self.output_dir, 'training_history.json'), 'w') as f:
@@ -412,7 +412,9 @@ class PyTorchTrainer:
         if isinstance(batch, dict):
             targets = batch.get('label', None)
             if targets is None:
-                raise ValueError("批次中找不到'label'鍵")
+                targets = batch.get('score', None)
+                if targets is None:
+                    raise ValueError("批次中找不到'label'或'score'鍵")
         else:
             targets = batch[1]
         
@@ -425,23 +427,90 @@ class PyTorchTrainer:
         unique_labels = torch.unique(targets)
         logger.info(f"唯一標籤值: {unique_labels}")
         
-        # 確保標籤是長整型
-        if self.config.get('model', {}).get('parameters', {}).get('is_classification', True):
-            targets = targets.long()
+        # 獲取任務類型和損失函數類型
+        is_classification = self.config.get('model', {}).get('parameters', {}).get('is_classification', True)
+        loss_type = self.config.get('training', {}).get('loss', {}).get('type', '')
+        
+        logger.info(f"任務類型: {'分類' if is_classification else '回歸'}")
+        logger.info(f"損失函數類型: {loss_type}")
+        
+        # 對標籤進行適當的轉換
+        if is_classification:
+            # 分類任務標籤處理
+            if 'Rank' in loss_type or 'rank' in loss_type:
+                # 排序損失函數需要浮點型標籤
+                targets = targets.float()
+                # 特別處理：如果標籤是一維的，但損失函數需要二維
+                if targets.dim() == 1 and outputs.dim() > 1:
+                    targets = targets.unsqueeze(1)
+                    logger.info(f"為排序損失調整標籤形狀: {targets.shape}")
+            elif loss_type == 'FocalLoss':
+                # 焦點損失需要長整型標籤
+                targets = targets.long()
+            else:
+                # 其他分類損失通常需要長整型標籤
+                targets = targets.long()
+                
             # 驗證標籤範圍
             max_label = torch.max(targets).item()
             min_label = torch.min(targets).item()
-            num_classes = outputs.size(1)
-            logger.info(f"標籤範圍: [{min_label}, {max_label}]")
-            logger.info(f"模型輸出類別數: {num_classes}")
             
-            if max_label >= num_classes:
-                raise ValueError(f"標籤值 {max_label} 超出模型輸出類別數 {num_classes}")
+            # 只有對於需要檢查類別數的損失函數才驗證
+            if loss_type in ['CrossEntropyLoss', 'NLLLoss', 'FocalLoss'] and outputs.dim() > 1:
+                num_classes = outputs.size(1)
+                logger.info(f"標籤範圍: [{min_label}, {max_label}]")
+                logger.info(f"模型輸出類別數: {num_classes}")
+                
+                if max_label >= num_classes:
+                    raise ValueError(f"標籤值 {max_label} 超出模型輸出類別數 {num_classes}")
         else:
-            # 回歸任務不需要驗證標籤範圍
-            logger.info("回歸任務，不驗證標籤範圍")
+            # 回歸任務通常需要浮點型標籤
+            targets = targets.float()
+            
+            # 特別處理：如果排序損失用於回歸任務並且形狀不匹配
+            if ('Rank' in loss_type or 'rank' in loss_type) and targets.dim() == 1 and outputs.dim() > 1:
+                targets = targets.unsqueeze(1)
+                logger.info(f"為排序損失調整標籤形狀: {targets.shape}")
         
-        return self.criterion(outputs, targets)
+        # 特殊處理某些具有特定輸入要求的損失函數
+        if 'BCE' in loss_type and 'Logits' not in loss_type:
+            # BCE需要0-1範圍的輸出，應用sigmoid
+            outputs = torch.sigmoid(outputs)
+            logger.info(f"為BCE損失應用sigmoid到輸出")
+        
+        # 使用criterion計算損失
+        try:
+            loss = self.criterion(outputs, targets)
+            logger.info(f"損失計算成功: {loss.item()}")
+            return loss
+        except Exception as e:
+            logger.error(f"計算損失時出錯: {str(e)}")
+            logger.error(f"輸出形狀: {outputs.shape}, 標籤形狀: {targets.shape}")
+            logger.error(f"嘗試解決形狀不匹配問題...")
+            
+            # 嘗試調整形狀後再計算
+            if outputs.dim() > 1 and targets.dim() == 1:
+                # 如果是多分類問題且標籤是一維的
+                if outputs.size(1) > 1:
+                    try:
+                        # 嘗試使用第一種方法：簡單將標籤轉為長整型
+                        targets_adjusted = targets.long()
+                        loss = self.criterion(outputs, targets_adjusted)
+                        logger.info(f"調整後損失計算成功(方法1)")
+                        return loss
+                    except Exception:
+                        # 嘗試使用第二種方法：擴展標籤維度
+                        try:
+                            targets_adjusted = targets.unsqueeze(1)
+                            loss = self.criterion(outputs, targets_adjusted)
+                            logger.info(f"調整後損失計算成功(方法2)")
+                            return loss
+                        except Exception:
+                            # 兩種方法都失敗，拋出原始錯誤
+                            raise
+            
+            # 如果沒有特殊處理方法，重新拋出原始錯誤
+            raise
 
     def _compute_metrics(self, outputs, batch):
         """計算評估指標
@@ -457,70 +526,167 @@ class PyTorchTrainer:
         if isinstance(batch, dict):
             targets = batch.get('label', None)
             if targets is None:
-                raise ValueError("批次中找不到'label'鍵")
+                targets = batch.get('score', None)
+                if targets is None:
+                    raise ValueError("批次中找不到'label'或'score'鍵")
         else:
             targets = batch[1]
         
-        # 確保標籤是長整型
-        targets = targets.long()
+        # 獲取任務類型和損失函數類型
+        is_classification = self.config.get('model', {}).get('parameters', {}).get('is_classification', True)
+        loss_type = self.config.get('training', {}).get('loss', {}).get('type', '')
+        
+        # 針對特定損失函數類型的處理
+        if 'Rank' in loss_type or 'rank' in loss_type:
+            # 排序損失函數需要不同的指標計算
+            return self._compute_ranking_metrics(outputs, targets)
+        
+        # 確保標籤是適當的類型
+        if is_classification:
+            targets = targets.long()
+        else:
+            targets = targets.float()
         
         # 獲取預測結果
-        is_classification = self.config.get('model', {}).get('parameters', {}).get('is_classification', True)
-        
         if is_classification:
-            predictions = torch.argmax(outputs, dim=1)
+            # 對於分類任務，獲取最大概率的類別
+            if outputs.dim() > 1 and outputs.size(1) > 1:
+                predictions = torch.argmax(outputs, dim=1)
+            else:
+                # 二分類情況
+                predictions = (outputs > 0.5).float()
         else:
             # 回歸任務，直接使用輸出作為預測
             predictions = outputs
+            if predictions.dim() > 1 and predictions.size(1) == 1:
+                predictions = predictions.squeeze(1)
         
         # 計算指標
         metrics = {}
         
         if is_classification:
+            # 如果形狀不一致，嘗試調整
+            if predictions.shape != targets.shape:
+                if targets.dim() > 1 and targets.size(1) == 1:
+                    targets = targets.squeeze(1)
+            
             # 準確率
-            correct = (predictions == targets).float()
-            accuracy = torch.mean(correct)
-            metrics['accuracy'] = accuracy.item()
+            try:
+                correct = (predictions == targets).float()
+                accuracy = torch.mean(correct)
+                metrics['accuracy'] = accuracy.item()
+            except Exception as e:
+                logger.warning(f"計算準確率時出錯: {str(e)}")
+                metrics['accuracy'] = 0.0
             
             # 轉換為 numpy 數組以使用 sklearn 的指標
-            y_true = targets.cpu().numpy()
-            y_pred = predictions.cpu().numpy()
-            
-            # F1分數 (macro平均)
             try:
-                from sklearn.metrics import f1_score
-                metrics['f1_score'] = f1_score(y_true, y_pred, average='macro')
+                y_true = targets.cpu().numpy()
+                y_pred = predictions.cpu().numpy()
+                
+                # F1分數 (macro平均)
+                try:
+                    from sklearn.metrics import f1_score
+                    metrics['f1_score'] = f1_score(y_true, y_pred, average='macro')
+                except Exception as e:
+                    logger.warning(f"計算F1分數時出錯: {str(e)}")
+                    metrics['f1_score'] = 0.0
+                
+                # 精確度 (macro平均)
+                try:
+                    from sklearn.metrics import precision_score
+                    metrics['precision'] = precision_score(y_true, y_pred, average='macro')
+                except Exception as e:
+                    logger.warning(f"計算精確度時出錯: {str(e)}")
+                    metrics['precision'] = 0.0
+                
+                # 召回率 (macro平均)
+                try:
+                    from sklearn.metrics import recall_score
+                    metrics['recall'] = recall_score(y_true, y_pred, average='macro')
+                except Exception as e:
+                    logger.warning(f"計算召回率時出錯: {str(e)}")
+                    metrics['recall'] = 0.0
             except Exception as e:
-                logger.warning(f"計算F1分數時出錯: {str(e)}")
-                metrics['f1_score'] = 0.0
-            
-            # 精確度 (macro平均)
-            try:
-                from sklearn.metrics import precision_score
-                metrics['precision'] = precision_score(y_true, y_pred, average='macro')
-            except Exception as e:
-                logger.warning(f"計算精確度時出錯: {str(e)}")
-                metrics['precision'] = 0.0
-            
-            # 召回率 (macro平均)
-            try:
-                from sklearn.metrics import recall_score
-                metrics['recall'] = recall_score(y_true, y_pred, average='macro')
-            except Exception as e:
-                logger.warning(f"計算召回率時出錯: {str(e)}")
-                metrics['recall'] = 0.0
+                logger.warning(f"準備指標計算數據時出錯: {str(e)}")
+                metrics['f1_score'] = metrics['precision'] = metrics['recall'] = 0.0
         else:
             # 回歸任務，計算MSE和MAE
             try:
-                from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+                # 處理維度問題
+                if predictions.dim() > 1:
+                    predictions = predictions.squeeze()
+                if targets.dim() > 1:
+                    targets = targets.squeeze()
+                
+                # 轉換為numpy數組
                 y_true = targets.cpu().numpy()
                 y_pred = predictions.cpu().numpy()
+                
+                from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
                 metrics['mse'] = mean_squared_error(y_true, y_pred)
                 metrics['mae'] = mean_absolute_error(y_true, y_pred)
                 metrics['r2'] = r2_score(y_true, y_pred)
             except Exception as e:
                 logger.warning(f"計算回歸指標時出錯: {str(e)}")
                 metrics['mse'] = metrics['mae'] = metrics['r2'] = 0.0
+        
+        return metrics
+    
+    def _compute_ranking_metrics(self, outputs, targets):
+        """計算排序指標
+        
+        Args:
+            outputs: 模型輸出
+            targets: 標籤數據
+            
+        Returns:
+            dict: 包含排序指標的字典
+        """
+        metrics = {}
+        
+        # 確保輸入是正確的形狀
+        if outputs.dim() > 1 and outputs.size(1) == 1:
+            outputs = outputs.squeeze(1)
+        if targets.dim() > 1 and targets.size(1) == 1:
+            targets = targets.squeeze(1)
+        
+        try:
+            # 計算Spearman相關系數
+            from scipy.stats import spearmanr
+            outputs_np = outputs.detach().cpu().numpy()
+            targets_np = targets.detach().cpu().numpy()
+            
+            # 使用scipy的spearmanr計算相關性
+            corr, _ = spearmanr(outputs_np, targets_np)
+            metrics['spearman'] = corr
+            
+            # 計算Kendall's Tau
+            from scipy.stats import kendalltau
+            tau, _ = kendalltau(outputs_np, targets_np)
+            metrics['kendall_tau'] = tau
+            
+            # 計算平均倒數排名(MRR)，適用於分類問題
+            try:
+                # 如果輸出是概率分佈
+                if outputs.dim() > 1 and outputs.size(1) > 1:
+                    # 獲取目標類別的預測概率
+                    target_probs = outputs.gather(1, targets.long().unsqueeze(1)).squeeze()
+                    # 獲取每個樣本的排名
+                    ranks = []
+                    for i, prob in enumerate(target_probs):
+                        # 計算當前樣本中有多少預測概率高於目標類別
+                        rank = (outputs[i] > prob).sum().item() + 1
+                        ranks.append(rank)
+                    # 計算MRR
+                    mrr = sum(1.0 / r for r in ranks) / len(ranks)
+                    metrics['mrr'] = mrr
+            except Exception as e:
+                logger.warning(f"計算MRR時出錯: {str(e)}")
+        
+        except Exception as e:
+            logger.warning(f"計算排序指標時出錯: {str(e)}")
+            metrics['spearman'] = metrics['kendall_tau'] = 0.0
         
         return metrics
 
@@ -559,32 +725,46 @@ class PyTorchTrainer:
         """
         # 獲取損失函數類型和參數
         loss_config = self.config.get('training', {}).get('loss', {})
-        loss_type = loss_config.get('type', 'MSELoss')
-        loss_params = loss_config.get('parameters', {})
         
-        logger.info(f"使用損失函數: {loss_type}，參數: {loss_params}")
+        # 使用LossFactory創建損失函數
+        from losses.loss_factory import LossFactory
         
-        # 根據損失函數類型創建損失函數實例
-        if loss_type == 'MSELoss':
-            return nn.MSELoss(**loss_params)
-        elif loss_type == 'CrossEntropyLoss':
-            return nn.CrossEntropyLoss(**loss_params)
-        elif loss_type == 'L1Loss':
-            return nn.L1Loss(**loss_params)
-        elif loss_type == 'SmoothL1Loss':
-            return nn.SmoothL1Loss(**loss_params)
-        elif loss_type == 'BCELoss':
-            return nn.BCELoss(**loss_params)
-        elif loss_type == 'BCEWithLogitsLoss':
-            return nn.BCEWithLogitsLoss(**loss_params)
-        elif loss_type == 'NLLLoss':
-            return nn.NLLLoss(**loss_params)
-        elif loss_type == 'KLDivLoss':
-            return nn.KLDivLoss(**loss_params)
-        else:
-            logger.warning(f"未知的損失函數類型: {loss_type}，使用默認的MSELoss")
-            return nn.MSELoss()
-        
+        try:
+            # 嘗試使用LossFactory創建損失函數
+            criterion = LossFactory.create_from_config(loss_config)
+            logger.info(f"使用LossFactory創建損失函數成功: {loss_config.get('type', '未指定類型')}")
+            return criterion
+        except Exception as e:
+            logger.warning(f"使用LossFactory創建損失函數失敗: {str(e)}")
+            logger.warning("回退到內置損失函數創建方法")
+            
+            # 如果LossFactory失敗，回退到內置方法
+            loss_type = loss_config.get('type', 'MSELoss')
+            loss_params = loss_config.get('parameters', {})
+            
+            logger.info(f"使用內置損失函數: {loss_type}，參數: {loss_params}")
+            
+            # 根據損失函數類型創建損失函數實例
+            if loss_type == 'MSELoss':
+                return nn.MSELoss(**loss_params)
+            elif loss_type == 'CrossEntropyLoss':
+                return nn.CrossEntropyLoss(**loss_params)
+            elif loss_type == 'L1Loss':
+                return nn.L1Loss(**loss_params)
+            elif loss_type == 'SmoothL1Loss':
+                return nn.SmoothL1Loss(**loss_params)
+            elif loss_type == 'BCELoss':
+                return nn.BCELoss(**loss_params)
+            elif loss_type == 'BCEWithLogitsLoss':
+                return nn.BCEWithLogitsLoss(**loss_params)
+            elif loss_type == 'NLLLoss':
+                return nn.NLLLoss(**loss_params)
+            elif loss_type == 'KLDivLoss':
+                return nn.KLDivLoss(**loss_params)
+            else:
+                logger.warning(f"未知的損失函數類型: {loss_type}，使用默認的MSELoss")
+                return nn.MSELoss()
+
     def evaluate(self, test_loader: Optional[DataLoader] = None) -> Dict[str, float]:
         """評估模型性能
         

@@ -1,0 +1,78 @@
+#python scripts/run_experiments.py --config config/feature_fcnn_regression.yaml
+
+global:
+  experiment_name: 'feature_fcnn_regression'
+  seed: 42
+  debug: false
+  device: 'auto'
+  output_dir: 'results'
+
+data:
+  type: 'feature'
+  source:
+    feature_dir: 'tests/dataloader_test/dataset_test'
+    feature_extension: 'npz'
+  preprocessing:
+    features:
+      normalize: true
+      pca: false
+      pca_components: 64
+  splits:
+    train_ratio: 0.7
+    val_ratio: 0.3
+    test_ratio: 0.0
+    split_by_patient: true
+    split_seed: 42
+  dataloader:
+    batch_size: 4
+    num_workers: 2
+    pin_memory: true
+    drop_last: false
+  filtering:
+    class_config:
+      NoMovement: 1
+      DrySwallow: 1
+      Cracker: 1
+      Jelly: 1
+      WaterDrinking: 1
+    task_type: 'regression'  # 回歸任務
+
+model:
+  type: 'fcnn'
+  parameters:
+    input_dim: 1024
+    hidden_layers: [512, 256, 128]
+    num_classes: 1
+    dropout_rate: 0.3
+    activation: 'relu'
+    is_classification: false  # 回歸模式
+    batch_norm: true
+
+training:
+  epochs: 50
+  save_every: 10
+  early_stopping:
+    enabled: true
+    patience: 8
+    min_delta: 0.001
+  loss:
+    type: 'MSELoss'  # 回歸任務的標準損失函數
+    parameters:
+      reduction: 'mean'
+  optimizer:
+    type: 'Adam'
+    parameters:
+      lr: 0.0005
+      weight_decay: 0.0001
+  scheduler:
+    type: 'ReduceLROnPlateau'
+    parameters:
+      mode: 'min'
+      factor: 0.5
+      patience: 5
+      min_lr: 0.00001
+
+evaluation:
+  metrics: ['mse', 'mae', 'r2_score']  # 回歸任務的適用指標
+  log_predictions: true
+  feature_importance: true 

@@ -1,3 +1,5 @@
+#python scripts/run_experiments.py --config config/audio_resnet_approxndcg.yaml
+
 global:
   experiment_name: 'audio_resnet_approxndcg'
   seed: 42
@@ -53,11 +55,16 @@ training:
     enabled: true
     patience: 10
     min_delta: 0.001
+  # 1. 標準損失函數配置
   loss:
-    type: 'ApproxNDCGLoss'
+    type: 'MSELoss'  # （適用於回歸任務）
     parameters:
-      temperature: 0.1
-      k: 5
+      reduction: 'mean'
+  
+  # loss:
+  #   type: 'CrossEntropyLoss'  # （適用於分類任務）
+  #   parameters:
+  #     reduction: 'mean'
   optimizer:
     type: 'AdamW'
     parameters:
