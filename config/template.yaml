@@ -1,11 +1,11 @@
 # 這是一個大模板yaml，包含data type, model, loss的各種配置選項
 
 global:
-  experiment_name: 'example_experiment'
-  seed: 42
-  debug: false
-  device: 'auto'
-  output_dir: 'results'
+  experiment_name: 'template_experiment'  # 實驗名稱，用於記錄和區分不同的實驗
+  seed: 42                                # 隨機種子，確保結果可重現
+  debug: false                            # 是否啟用調試模式
+  device: 'auto'                          # 執行設備，'auto'自動選擇，或指定'cuda:0', 'cpu'
+  output_dir: 'results'                   # 結果輸出目錄
 
 data:
   # 選擇數據類型：音頻、頻譜圖或特徵
@@ -229,3 +229,50 @@ evaluation:
   # metrics: ['accuracy', 'f1_score', 'precision', 'recall']  # 分類評估指標
   log_predictions: true
   confusion_matrix: true  # 僅分類任務使用
+
+# 數據分析配置：整合SBP_analyzer功能進行模型與數據分析
+analysis:
+  enabled: true                           # 是否啟用分析功能
+  
+  # 模型分析配置：監控模型內部狀態
+  model_analytics:
+    enabled: true                         # 是否啟用模型分析
+    output_dir: 'analysis_results'        # 分析結果保存目錄
+    save_frequency: 1                     # 分析結果保存頻率(每多少epoch)
+    monitored_layers:                     # 要監控的層名稱，如果為null則監控所有層
+      - 'encoder.layer1'                  # 可以通過查看模型結構獲取層名稱
+      - 'encoder.layer2'
+      - 'decoder'
+    monitored_params:                     # 要監控的參數，如果為null則監控所有參數
+      - 'encoder.layer1.weight'
+      - 'decoder.weight'
+  
+  # 數據監控配置：監控數據分佈情況
+  data_monitor:
+    enabled: true                         # 是否啟用數據監控
+    batch_frequency: 10                   # 每多少批次進行一次監控
+    visualization: true                   # 是否生成可視化
+    metrics:                              # 要計算的統計指標
+      - 'mean'
+      - 'std'
+      - 'min'
+      - 'max'
+      - 'skew'
+  
+  # 特徵監控配置：分析中間特徵提取情況
+  feature_monitor:
+    enabled: true                         # 是否啟用特徵監控
+    epoch_frequency: 1                    # 每多少epoch監控一次
+    visualization: true                   # 是否生成可視化
+    methods:                              # 使用的特徵分析方法
+      - 'pca'                             # 主成分分析
+      - 't-sne'                           # t-SNE降維可視化
+      - 'feature_importance'              # 特徵重要性分析
+  
+  # 異常檢測配置：檢測數據與預測中的異常
+  outlier_detection:
+    enabled: false                        # 是否啟用異常檢測
+    methods:                              # 使用的異常檢測方法
+      - 'isolation_forest'                # 隔離森林
+      - 'local_outlier_factor'            # 局部異常因子
+    threshold: 0.95                       # 異常閾值

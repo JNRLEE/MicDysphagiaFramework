@@ -1,10 +1,23 @@
-# 忽略資料集目錄
+# 忽略資料集和原始數據
 data/
+*.csv
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.mp4
+*.h5
+*.npy
+*.npz
 
 # 忽略虛擬環境
 .venv/
 venv/
 env/
+virtualenv/
+.env
+.conda/
+conda-env/
 
 # 忽略Python編譯文件
 __pycache__/
@@ -12,9 +25,31 @@ __pycache__/
 *$py.class
 *.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# 忽略日誌文件
+# 忽略日誌和臨時文件
 *.log
+logs/
+tmp/
+temp/
+.~*
+~*
+*.bak
+*.swp
 
 # 忽略編輯器和IDE文件
 .idea/
@@ -22,13 +57,51 @@ __pycache__/
 *.swp
 *.swo
 .DS_Store
-
-# 忽略輸出和結果檔案
-outputs/
-results/
+*.sublime*
+.atom/
+.project
+.settings/
+.cursor/
 
 # 忽略Jupyter Notebook檔案
 .ipynb_checkpoints
+*.ipynb
 
-# 忽略Cursor編輯器文件
-.cursor/ 
+# 忽略輸出、結果和模型檔案
+outputs/
+results/
+runs/
+checkpoints/
+*.pth
+*.pt
+*.bin
+*.onnx
+*.h5
+*.model
+*.ckpt
+*.pkl
+wandb/
+tensorboard/
+
+# 忽略系統文件
+.DS_Store
+Thumbs.db
+.directory
+desktop.ini
+$RECYCLE.BIN/
+
+# 忽略敏感配置或證書
+*.pem
+*.key
+*.crt
+*_credentials.json
+*credentials*.json
+*config*.json
+*secrets*.yaml
+*secrets*.yml
+
+# 保留這些目錄的結構但不保留其內容
+!data/.gitkeep
+!outputs/.gitkeep
+!results/.gitkeep
+!checkpoints/.gitkeep 

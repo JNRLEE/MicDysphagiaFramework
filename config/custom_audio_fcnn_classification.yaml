@@ -1,0 +1,127 @@
+#python scripts/run_experiments.py --config config/custom_audio_fcnn_classification.yaml
+global:
+  experiment_name: 'custom_audio_fcnn_classification'
+  seed: 42
+  debug: false
+  device: 'auto'
+  output_dir: 'results'
+
+data:
+  type: 'audio'
+  source:
+    wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
+  preprocessing:
+    audio:
+      sr: 16000
+      duration: 5
+      normalize: true
+    spectrogram:
+      method: 'mel'
+      n_mels: 128
+      n_fft: 1024
+      hop_length: 512
+      power: 2.0
+      normalized: true
+  filtering:
+    # 自定義分類設定 - 只從老闆的Excel檔案中取分類
+    custom_classification:
+      enabled: true # 啟用自定義分類
+      excel_path: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/data/吞嚥聲音名單(共同編輯).xlsx' # Excel檔案路徑
+      patient_id_column: 'A' # 患者ID所在欄位
+      class_column: 'P' # 分類所在欄位
+      # 新增動作類型過濾設定
+      class_config:
+        NoMovement: 1
+        DrySwallow: 1
+        Cracker: 1
+        Jelly: 1
+        WaterDrinking: 1
+      # 新增排除特定分類類別設定
+      exclude_classes:
+        - 'nan'  # 排除nan類別
+        - '正常'  # 排除正常類別
+
+    # 這些原始分類設定會被忽略
+    score_thresholds:
+      normal: 0  # score <= 0 為正常人
+      patient: 9  # score >= 9 為病人
+    class_config:
+      NoMovement: 1
+      DrySwallow: 1
+      Cracker: 1
+      Jelly: 1
+      WaterDrinking: 1
+    subject_source:
+      normal:
+        include_N: 1  # 包含 N 開頭的正常人
+        include_P: 1  # 包含 P 開頭的正常人
+      patient:
+        include_N: 0  # 不包含 N 開頭的病人
+        include_P: 1  # 包含 P 開頭的病人
+    task_type: 'classification'  # 分類任務
+
+  splits:
+    train_ratio: 0.7
+    val_ratio: 0.15
+    test_ratio: 0.15
+    split_by_patient: true
+    split_seed: 42
+  dataloader:
+    batch_size: 16
+    num_workers: 2
+    pin_memory: true
+    drop_last: false
+
+model:
+  type: 'fcnn'
+  parameters:
+    input_dim: 1024
+    hidden_layers: [512, 256, 128]
+    num_classes: 10
+    dropout_rate: 0.3
+    activation: 'relu'
+    is_classification: false
+    batch_norm: true
+
+training:
+  epochs: 2
+  save_every: 2
+  early_stopping:
+    enabled: true
+    patience: 8
+    min_delta: 0.001
+  loss:
+    type: 'CrossEntropyLoss'  # （適用於分類任務）
+    parameters:
+      reduction: 'mean'
+  # loss:
+  #   combined:
+  #     mse:
+  #       type: 'MSELoss'
+  #       weight: 0.6
+  #       parameters:
+  #         reduction: 'mean'
+  #     ranking:
+  #       type: 'ListMLELoss'
+  #       weight: 0.4
+  #       parameters:
+  #         batch_size_per_group: 8
+  #         temperature: 1.0
+  optimizer:
+    type: 'Adam'
+    parameters:
+      lr: 0.0005
+      weight_decay: 0.0001
+  scheduler:
+    type: 'ReduceLROnPlateau'
+    parameters:
+      mode: 'min'
+      factor: 0.5
+      patience: 5
+      min_lr: 0.00001
+
+evaluation:
+  metrics: ['mse', 'mae', 'ndcg', 'r2_score']
+  ndcg_k: 5
+  log_predictions: true
+  feature_importance: true 

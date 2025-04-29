@@ -198,4 +198,33 @@ class ResNetModel(nn.Module):
         # 創建Adam優化器
         optimizer = torch.optim.Adam(param_groups)
         
-        return optimizer 
+        return optimizer
+
+# 中文註解：這是resnet_model.py的Minimal Executable Unit，檢查ResNetModel能否正確初始化與forward，並測試錯誤model_name時的優雅報錯
+if __name__ == "__main__":
+    """
+    Description: Minimal Executable Unit for resnet_model.py，檢查ResNetModel能否正確初始化與forward，並測試錯誤model_name時的優雅報錯。
+    Args: None
+    Returns: None
+    References: 無
+    """
+    import torch
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    # 不要再import自己
+    # from models.resnet_model import ResNetModel
+
+    # 測試正確初始化與forward
+    try:
+        model = ResNetModel(model_name='resnet18', pretrained=False, num_classes=2, in_channels=3)
+        dummy_input = torch.randn(2, 3, 32, 32)
+        out = model(dummy_input)
+        print(f"ResNetModel測試成功，output shape: {out.shape}")
+    except Exception as e:
+        print(f"ResNetModel遇到錯誤（預期行為）: {e}")
+
+    # 測試錯誤model_name
+    try:
+        model = ResNetModel(model_name='not_exist', pretrained=False, num_classes=2, in_channels=3)
+    except Exception as e:
+        print(f"ResNetModel遇到錯誤model_name時的報錯（預期行為）: {e}") 

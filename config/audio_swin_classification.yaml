@@ -1,5 +1,5 @@
 #python scripts/run_experiments.py --config config/audio_swin_classification.yaml
-
+# cd /Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My\ Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework && python scripts/run_experiments.py --config config/audio_swin_classification.yaml
 global:
   experiment_name: 'audio_swin_classification'
   seed: 42
@@ -10,7 +10,7 @@ global:
 data:
   type: 'audio'
   source:
-    wav_dir: 'tests/dataloader_test/dataset_test'
+    wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
   preprocessing:
     audio:
       sr: 16000
@@ -71,8 +71,8 @@ model:
     enabled: false
 
 training:
-  epochs: 50
-  save_every: 10
+  epochs: 6
+  save_every: 3
   early_stopping:
     enabled: true
     patience: 10
@@ -86,10 +86,10 @@ training:
   #   parameters:
   #     reduction: 'mean'
   
-  # loss:
-  #   type: 'CrossEntropyLoss'  # （適用於分類任務）
-  #   parameters:
-  #     reduction: 'mean'
+  loss:
+    type: 'CrossEntropyLoss'  # （適用於分類任務）
+    parameters:
+      reduction: 'mean'
   
   # 2. 排序損失函數配置
   
@@ -151,3 +151,5 @@ evaluation:
   metrics: ['accuracy', 'f1_score', 'precision', 'recall']
   log_predictions: true
   confusion_matrix: true 
+
+

@@ -1,13 +1,32 @@
-# 根據.gitignore生成的.dockerignore
+# MicDysphagiaFramework Docker 構建排除清單
+# 最後更新：2025-04-15
 
-# 忽略資料集目錄
+# 忽略資料集和原始數據
 data/
-# 但保留資料集目錄結構(如果有必要，可在執行容器時掛載數據)
+*.csv
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.mp4
+*.h5
+*.npy
+*.npz
+
+# 保留空目錄用於結構
+!data/.gitkeep
+!outputs/.gitkeep
+!results/.gitkeep
+!checkpoints/.gitkeep
 
 # 忽略虛擬環境
 .venv/
 venv/
 env/
+virtualenv/
+.env
+.conda/
+conda-env/
 
 # 忽略Python編譯文件
 __pycache__/
@@ -15,9 +34,31 @@ __pycache__/
 *$py.class
 *.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# 忽略日誌文件
+# 忽略日誌和臨時文件
 *.log
+logs/
+tmp/
+temp/
+.~*
+~*
+*.bak
+*.swp
 
 # 忽略編輯器和IDE文件
 .idea/
@@ -25,18 +66,57 @@ __pycache__/
 *.swp
 *.swo
 .DS_Store
-.cursor/
-
-# 忽略輸出和結果檔案
-outputs/
-results/
+*.sublime*
+.atom/
+.project
+.settings/
+.cursor/ 
 
 # 忽略Jupyter Notebook檔案
 .ipynb_checkpoints
+*.ipynb
+
+# 忽略輸出、結果和模型檔案
+outputs/
+results/
+runs/
+checkpoints/
+*.pth
+*.pt
+*.bin
+*.onnx
+*.h5
+*.model
+*.ckpt
+*.pkl
+wandb/
+tensorboard/
+
+# 忽略系統文件
+.DS_Store
+Thumbs.db
+.directory
+desktop.ini
+$RECYCLE.BIN/
 
 # 忽略Git相關文件
 .git/
 .gitignore
+.github/
+
+# 忽略敏感配置或證書
+*.pem
+*.key
+*.crt
+*_credentials.json
+*credentials*.json
+*config*.json
+*secrets*.yaml
+*secrets*.yml
+
+# 這些文件在運行時會直接使用
+!requirements.txt
+!config/*.yaml
 
 # 忽略Docker相關文件
 .dockerignore

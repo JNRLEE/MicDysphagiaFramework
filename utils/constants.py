@@ -40,4 +40,27 @@ CLASS_LABELS = [
 LABEL_TO_INDEX = {label: idx for idx, label in enumerate(CLASS_LABELS)}
 
 # 索引到標籤的映射
-INDEX_TO_LABEL = {idx: label for idx, label in enumerate(CLASS_LABELS)} 
+INDEX_TO_LABEL = {idx: label for idx, label in enumerate(CLASS_LABELS)}
+
+# 中文註解：這是constants.py的Minimal Executable Unit，檢查常量字典與映射能正確查詢與轉換，並測試查詢不存在key時的行為
+if __name__ == "__main__":
+    """
+    Description: Minimal Executable Unit for constants.py，檢查常量字典與映射能正確查詢與轉換，並測試查詢不存在key時的行為。
+    Args: None
+    Returns: None
+    References: 無
+    """
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    try:
+        print("SELECTION_TYPES['Jelly']: ", SELECTION_TYPES['Jelly'])
+        print("LABEL_TO_INDEX['Normal-DrySwallow']: ", LABEL_TO_INDEX['Normal-DrySwallow'])
+        print("INDEX_TO_LABEL[3]: ", INDEX_TO_LABEL[3])
+        print("常量查詢測試成功")
+    except Exception as e:
+        print(f"常量查詢測試失敗: {e}")
+    # 測試不存在key
+    try:
+        print(LABEL_TO_INDEX['NotExist'])
+    except Exception as e:
+        print(f"查詢不存在key時的報錯（預期行為）: {e}") 

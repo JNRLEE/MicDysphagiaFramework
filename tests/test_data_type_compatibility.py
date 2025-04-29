@@ -93,12 +93,19 @@ class TestDataTypeCompatibility(unittest.TestCase):
     def _create_dataset(self, dataset_class, task_type):
         """創建指定類型的數據集"""
         config = self.base_config.copy()
-        config['data']['task_type'] = task_type
+        config['data']['filtering']['task_type'] = task_type
         
-        dataset = dataset_class(
-            root_dir=self.test_data_dir,
-            config=config
-        )
+        # 根據數據集類型使用對應的參數名稱
+        if dataset_class.__name__ == 'SpectrogramDataset':
+            dataset = dataset_class(
+                data_path=self.test_data_dir,
+                config=config
+            )
+        else:
+            dataset = dataset_class(
+                root_dir=self.test_data_dir,
+                config=config
+            )
         
         return dataset
     
@@ -146,7 +153,7 @@ class TestDataTypeCompatibility(unittest.TestCase):
             }
         
         loss_factory = LossFactory()
-        return loss_factory.create_loss(loss_config)
+        return loss_factory.get_loss(loss_config)
     
     def _test_complete_data_flow(self, dataset_class, model_type, task_type):
         """測試完整數據流程，確認類型兼容性"""

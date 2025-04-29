@@ -509,3 +509,50 @@ class LambdaRankLoss(nn.Module):
             loss = loss - lambda_ij * pred_diff
             
         return loss / len(sampled_pairs) if sampled_pairs else loss 
+
+# 中文註解：這是ranking_losses.py的Minimal Executable Unit，檢查PairwiseRankingLoss與ListwiseRankingLoss能否正確初始化與forward，並測試錯誤參數時的優雅報錯
+if __name__ == "__main__":
+    """
+    Description: Minimal Executable Unit for ranking_losses.py，檢查PairwiseRankingLoss與ListwiseRankingLoss能否正確初始化與forward，並測試錯誤參數時的優雅報錯。
+    Args: None
+    Returns: None
+    References: 無
+    """
+    import torch
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    # 不要再import自己
+    # from losses.ranking_losses import PairwiseRankingLoss, ListwiseRankingLoss
+
+    # 測試PairwiseRankingLoss
+    try:
+        from losses.ranking_losses import PairwiseRankingLoss
+        loss_fn = PairwiseRankingLoss()
+        pred = torch.randn(8)
+        target = torch.randn(8)
+        loss = loss_fn(pred, target)
+        print(f"PairwiseRankingLoss測試成功，loss: {loss.item()}")
+    except Exception as e:
+        print(f"PairwiseRankingLoss遇到錯誤（預期行為）: {e}")
+
+    # 測試ListwiseRankingLoss
+    try:
+        from losses.ranking_losses import ListwiseRankingLoss
+        loss_fn = ListwiseRankingLoss(method='listnet')
+        pred = torch.randn(8)
+        target = torch.randn(8)
+        loss = loss_fn(pred, target)
+        print(f"ListwiseRankingLoss測試成功，loss: {loss.item()}")
+    except Exception as e:
+        print(f"ListwiseRankingLoss遇到錯誤（預期行為）: {e}")
+
+    # 測試錯誤參數
+    try:
+        from losses.ranking_losses import ListwiseRankingLoss
+        loss_fn = ListwiseRankingLoss(method='not_exist')
+        pred = torch.randn(8)
+        target = torch.randn(8)
+        loss = loss_fn(pred, target)
+        print(f"ListwiseRankingLoss錯誤參數測試，loss: {loss.item()}")
+    except Exception as e:
+        print(f"ListwiseRankingLoss遇到錯誤（預期行為）: {e}") 

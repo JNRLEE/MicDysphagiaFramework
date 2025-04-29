@@ -168,4 +168,36 @@ class HuberLossWrapper(nn.HuberLoss):
     """Huber損失函數的包裝器"""
     pass
 
-# 其他需要的標準PyTorch損失函數可以在這裡註冊... 
+# 其他需要的標準PyTorch損失函數可以在這裡註冊...
+
+# 中文註解：這是loss_factory.py的Minimal Executable Unit，檢查LossFactory能否正確創建損失函數，並測試錯誤type時的優雅報錯
+if __name__ == "__main__":
+    """
+    Description: Minimal Executable Unit for loss_factory.py，檢查LossFactory能否正確創建損失函數，並測試錯誤type時的優雅報錯。
+    Args: None
+    Returns: None
+    References: 無
+    """
+    import torch
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    # 不要再import自己
+    # from losses.loss_factory import LossFactory
+
+    # 測試正確type
+    try:
+        config = {"type": "MSELoss", "parameters": {}}
+        loss_fn = LossFactory.get_loss(config)
+        pred = torch.randn(4, 3)
+        target = torch.randn(4, 3)
+        loss = loss_fn(pred, target)
+        print(f"MSELoss測試成功，loss: {loss.item()}")
+    except Exception as e:
+        print(f"遇到錯誤（預期行為）: {e}")
+
+    # 測試錯誤type
+    try:
+        config = {"type": "NotExistLoss", "parameters": {}}
+        loss_fn = LossFactory.get_loss(config)
+    except Exception as e:
+        print(f"遇到錯誤type時的報錯（預期行為）: {e}") 

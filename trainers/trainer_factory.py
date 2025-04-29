@@ -83,4 +83,59 @@ def create_trainer(config: Dict[str, Any], model, dataloaders: Tuple) -> Any:
     Returns:
         Any: 創建的訓練器實例
     """
-    return TrainerFactory.create_trainer(config, model, dataloaders) 
+    return TrainerFactory.create_trainer(config, model, dataloaders)
+
+# 中文註解：這是trainer_factory.py的Minimal Executable Unit，檢查TrainerFactory能否正確創建訓練器並執行train，並測試錯誤配置時的優雅報錯
+if __name__ == "__main__":
+    """
+    Description: Minimal Executable Unit for trainer_factory.py，檢查TrainerFactory能否正確創建訓練器並執行train，並測試錯誤配置時的優雅報錯。
+    Args: None
+    Returns: None
+    References: 無
+    """
+    import torch
+    import torch.nn as nn
+    from torch.utils.data import DataLoader, TensorDataset
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    # 不要再import自己
+    # from trainers.trainer_factory import TrainerFactory
+
+    class DummyNet(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc = nn.Linear(4, 2)
+        def forward(self, x):
+            return self.fc(x)
+
+    x = torch.randn(20, 4)
+    y = torch.randint(0, 2, (20,))
+    dataset = TensorDataset(x, y)
+    loader = DataLoader(dataset, batch_size=4)
+    def dict_loader(dl):
+        for xb, yb in dl:
+            yield {"features": xb, "label": yb}
+    train_loader = dict_loader(loader)
+    val_loader = dict_loader(loader)
+    test_loader = dict_loader(loader)
+
+    config = {
+        "model": {"type": "fcnn", "parameters": {"is_classification": True}},
+        "training": {"epochs": 1, "learning_rate": 0.01, "loss": {"type": "CrossEntropyLoss", "parameters": {}}},
+        "data": {"type": "feature"},
+        "global": {"experiment_name": "dummy_exp", "output_dir": "results"}
+    }
+    try:
+        model = DummyNet()
+        trainer = TrainerFactory.create_trainer(config, model, (train_loader, val_loader, test_loader))
+        print("TrainerFactory測試成功")
+    except Exception as e:
+        print(f"TrainerFactory遇到錯誤（預期行為）: {e}")
+
+    # 錯誤配置測試
+    try:
+        bad_config = {"model": {}, "training": {}, "data": {}, "global": {}}
+        model = DummyNet()
+        trainer = TrainerFactory.create_trainer(bad_config, model, (train_loader, val_loader, test_loader))
+    except Exception as e:
+        print(f"TrainerFactory遇到錯誤配置時的報錯（預期行為）: {e}") 

@@ -1,418 +1,158 @@
 """
-實驗執行模組：用於執行吞嚥障礙評估模型實驗
-功能：
-1. 載入配置檔案
-2. 設置實驗記錄
-3. 初始化數據加載器
-4. 初始化模型和損失函數
-5. 進行訓練、驗證和測試
-6. 保存結果和視覺化圖表
+實驗執行腳本：執行基於YAML配置的實驗
+
+此腳本負責解析命令行參數，加載並驗證YAML配置文件，
+然後設置數據集、模型和訓練器，並執行實驗。
 """
 
+import argparse
+import logging
 import os
 import sys
 import yaml
 import torch
-import logging
-import argparse
-import numpy as np
-import matplotlib.pyplot as plt
-import time
 import json
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, Any, Tuple, List, Optional
+from typing import Dict, Any
 
-# 添加項目根目錄到路徑
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# 確保當前目錄在系統路徑中，以便導入自定義模塊
+# 將項目根目錄添加到系統路徑
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)  # 使用insert(0)確保它是最優先檢查的路徑
 
-# 導入必要的模組
-from utils.config_loader import load_config
-from data.dataset_factory import create_dataloaders
-from models.model_factory import create_model
-from losses.loss_factory import LossFactory
-from trainers.trainer_factory import create_trainer
-from utils.data_adapter import adapt_datasets_to_model
+# 導入必要的模塊
+from data import dataset_factory
+from models import model_factory
+from trainers import trainer_factory
+from models.hook_bridge import get_analyzer_callbacks_from_config  # 新增：導入獲取分析器回調的函數
+from utils.save_manager import SaveManager  # 新增：導入 SaveManager
 
+# 設置日誌記錄
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
 
-def setup_logging(log_dir: str, experiment_id: str) -> logging.Logger:
-    """設置日誌記錄
-    
-    Args:
-        log_dir: 日誌保存目錄
-        experiment_id: 實驗ID
-        
-    Returns:
-        logging.Logger: 配置好的日誌記錄器
-        
-    Description:
-        建立日誌記錄器，配置格式和輸出目的地
-        
-    References:
-        https://docs.python.org/3/library/logging.html
-    """
-    os.makedirs(log_dir, exist_ok=True)
-    
-    # 創建日誌記錄器
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    
-    # 清除現有的處理器
-    if logger.handlers:
-        logger.handlers.clear()
-    
-    # 添加控制台處理器
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    console_handler.setFormatter(console_format)
-    logger.addHandler(console_handler)
-    
-    # 添加文件處理器
-    file_handler = logging.FileHandler(os.path.join(log_dir, f'{experiment_id}.log'))
-    file_handler.setLevel(logging.INFO)
-    file_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(file_format)
-    logger.addHandler(file_handler)
-    
-    # 同時記錄到公共實驗日誌
-    exp_log_path = os.path.join(log_dir, 'experiments.log')
-    exp_handler = logging.FileHandler(exp_log_path)
-    exp_handler.setLevel(logging.INFO)
-    exp_format = logging.Formatter('%(asctime)s - %(message)s')
-    exp_handler.setFormatter(exp_format)
-    
-    # 創建過濾器，只記錄元數據到公共日誌
-    class MetadataFilter(logging.Filter):
-        def filter(self, record):
-            return hasattr(record, 'metadata') and record.metadata
-    
-    exp_handler.addFilter(MetadataFilter())
-    logger.addHandler(exp_handler)
-    
-    return logger
-
-
-def log_metadata(logger: logging.Logger, config: Dict[str, Any], experiment_id: str) -> None:
-    """記錄實驗元數據
-    
-    Args:
-        logger: 日誌記錄器
-        config: 配置字典
-        experiment_id: 實驗ID
-        
-    Description:
-        將實驗配置和環境信息記錄到日誌中
-        
-    References:
-        None
-    """
-    metadata = {
-        "experiment_id": experiment_id,
-        "timestamp": datetime.now().isoformat(),
-        "config": config,
-        "pytorch_version": torch.__version__,
-        "cuda_available": torch.cuda.is_available(),
-        "cuda_devices": torch.cuda.device_count() if torch.cuda.is_available() else 0
-    }
-    
-    if torch.cuda.is_available():
-        metadata["cuda_device_name"] = torch.cuda.get_device_name(0)
-    
-    # 使用額外的參數來標記這是元數據記錄
-    logger.info(f"實驗開始：{experiment_id}", extra={"metadata": True})
-    logger.info(f"配置：{json.dumps(config, indent=2)}", extra={"metadata": True})
-    logger.info(f"環境：PyTorch {torch.__version__}, "
-               f"CUDA {'可用' if torch.cuda.is_available() else '不可用'}", 
-               extra={"metadata": True})
-
+logger = logging.getLogger(__name__)
 
 def parse_args():
-    """解析命令行參數
-    
-    Returns:
-        argparse.Namespace: 解析後的參數
-        
-    Description:
-        解析命令行參數，設置實驗配置
-        
-    References:
-        https://docs.python.org/3/library/argparse.html
-    """
-    parser = argparse.ArgumentParser(description='吞嚥障礙評估模型訓練')
-    
-    parser.add_argument('--config', type=str, required=True, help='配置文件路徑')
-    parser.add_argument('--default_config', type=str, help='默認配置文件路徑')
-    parser.add_argument('--output_dir', type=str, help='輸出目錄')
-    parser.add_argument('--device', type=str, help='使用的設備，例如cuda:0或cpu')
-    parser.add_argument('--eval_only', action='store_true', help='僅進行評估，不訓練')
-    parser.add_argument('--checkpoint', type=str, help='模型檢查點路徑，用於評估或繼續訓練')
-    parser.add_argument('--seed', type=int, help='隨機種子')
-    
+    """解析命令行參數"""
+    parser = argparse.ArgumentParser(description='運行吞嚥聲音分析實驗')
+    parser.add_argument('--config', required=True, help='YAML 配置文件路徑')
+    parser.add_argument('--device', default=None, help='設備 (例如 cuda:0, cpu)')
+    parser.add_argument('--output_dir', default=None, help='輸出目錄')
+    parser.add_argument('--debug', action='store_true', help='啟用調試模式')
     return parser.parse_args()
 
-
-def set_seed(seed: int) -> None:
-    """設置隨機種子以確保實驗可重現
+def load_config(config_path: str) -> Dict[str, Any]:
+    """加載並驗證 YAML 配置文件
     
     Args:
-        seed: 隨機種子
+        config_path: YAML 配置文件路徑
         
-    Description:
-        為Python、NumPy和PyTorch設置隨機種子，確保實驗結果可重現
-        
-    References:
-        https://pytorch.org/docs/stable/notes/randomness.html
+    Returns:
+        Dict[str, Any]: 配置字典
     """
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+    
+    # TODO: 添加配置驗證邏輯
+    
+    return config
 
-
-def save_model(model, save_path: str, experiment_id: str, epoch: int) -> None:
-    """保存模型檢查點
+def setup_experiment(config: Dict[str, Any], args) -> Dict[str, Any]:
+    """設置實驗環境並應用命令行覆蓋
     
     Args:
-        model: 要保存的模型
-        save_path: 保存目錄
-        experiment_id: 實驗ID
-        epoch: 當前訓練輪數
+        config: 從 YAML 文件加載的配置
+        args: 命令行參數
         
-    Description:
-        將模型權重保存到指定路徑
-        
-    References:
-        https://pytorch.org/tutorials/beginner/saving_loading_models.html
+    Returns:
+        Dict[str, Any]: 修改後的配置
     """
-    os.makedirs(save_path, exist_ok=True)
-    checkpoint_path = os.path.join(save_path, f"{experiment_id}_epoch_{epoch}.pth")
-    
-    torch.save({
-        'epoch': epoch,
-        'model_state_dict': model.state_dict(),
-    }, checkpoint_path)
-    
-    logging.info(f"保存模型檢查點到 {checkpoint_path}")
-
-
-def plot_training_curves(history: Dict[str, List], save_path: str, experiment_id: str) -> None:
-    """繪製訓練曲線
-    
-    Args:
-        history: 訓練歷史記錄
-        save_path: 保存目錄
-        experiment_id: 實驗ID
-        
-    Description:
-        根據訓練歷史繪製損失和評估指標曲線
-        
-    References:
-        https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.html
-    """
-    os.makedirs(save_path, exist_ok=True)
-    
-    # 繪製損失曲線
-    plt.figure(figsize=(12, 5))
-    
-    # 訓練集和驗證集損失
-    plt.subplot(1, 2, 1)
-    plt.plot(history['train_loss'], label='Train Loss')
-    plt.plot(history['val_loss'], label='Validation Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('Training and Validation Loss')
-    plt.legend()
-    plt.grid(True)
-    
-    # 評估指標
-    plt.subplot(1, 2, 2)
-    if 'train_accuracy' in history:
-        plt.plot(history['train_accuracy'], label='Train Accuracy')
-        plt.plot(history['val_accuracy'], label='Validation Accuracy')
-        plt.ylabel('Accuracy')
-    elif 'train_mae' in history:
-        plt.plot(history['train_mae'], label='Train MAE')
-        plt.plot(history['val_mae'], label='Validation MAE')
-        plt.ylabel('MAE')
-    
-    plt.xlabel('Epoch')
-    plt.title('Training and Validation Metric')
-    plt.legend()
-    plt.grid(True)
-    
-    plt.tight_layout()
-    plt.savefig(os.path.join(save_path, f"{experiment_id}_training_curves.png"))
-    plt.close()
-    
-    logging.info(f"保存訓練曲線圖到 {save_path}/{experiment_id}_training_curves.png")
-
-
-def main():
-    """主函數
-    
-    Description:
-        實驗執行的主入口，處理配置加載、模型訓練和評估
-        
-    References:
-        None
-    """
-    # 解析命令行參數
-    args = parse_args()
-    
-    # 載入配置
-    config_loader = load_config(args.config, args.default_config)
-    config = config_loader.config
-    
-    # 更新配置（如果命令行有指定）
-    if args.output_dir:
-        config['global']['output_dir'] = args.output_dir
+    # 應用命令行參數覆蓋
     if args.device:
         config['global']['device'] = args.device
-    if args.seed:
-        config['global']['seed'] = args.seed
-        
-    # 創建實驗ID
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    experiment_name = config['global'].get('experiment_name', 'experiment')
-    experiment_id = f"{experiment_name}_{timestamp}"
+    
+    if args.output_dir:
+        config['global']['output_dir'] = args.output_dir
+    
+    if args.debug:
+        config['global']['debug'] = True
     
     # 設置輸出目錄
-    output_dir = config['global'].get('output_dir', 'results')
-    log_dir = os.path.join(output_dir, 'logs')
-    model_dir = os.path.join(output_dir, 'models')
-    results_dir = os.path.join(output_dir, 'plots')
-    experiment_dir = os.path.join(output_dir, experiment_id)
-    os.makedirs(experiment_dir, exist_ok=True)
-    
-    # 設置日誌
-    logger = setup_logging(log_dir, experiment_id)
-    
-    # 記錄元數據
-    log_metadata(logger, config, experiment_id)
-    
-    # 設置隨機種子
-    seed = config['global'].get('seed', 42)
-    set_seed(seed)
-    logger.info(f"設置隨機種子: {seed}")
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    config['global']['output_dir'] = os.path.join(
+        config['global'].get('output_dir', 'results'),
+        f"{config['global']['experiment_name']}_{timestamp}"
+    )
     
     # 設置設備
-    device_str = config['global'].get('device', 'auto')
-    if device_str == 'auto':
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    else:
-        device = torch.device(device_str)
-    logger.info(f"使用設備: {device}")
+    if config['global'].get('device', 'auto') == 'auto':
+        config['global']['device'] = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-    # 創建數據加載器
-    logger.info("初始化數據加載器...")
-    try:
-        train_loader, val_loader, test_loader = create_dataloaders(config)
-        logger.info(f"數據加載成功：訓練集 {len(train_loader.dataset)} 樣本，"
-                  f"驗證集 {len(val_loader.dataset)} 樣本，"
-                  f"測試集 {len(test_loader.dataset)} 樣本")
-    except Exception as e:
-        logger.error(f"數據加載失敗: {str(e)}")
-        raise
+    # 設置種子以確保可重現性
+    if 'seed' in config['global']:
+        seed = config['global']['seed']
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed)
+    
+    # 創建實驗目錄並保存配置
+    os.makedirs(config['global']['output_dir'], exist_ok=True)
+    save_manager = SaveManager(config['global']['output_dir'])
+    save_manager.save_config(config)
+    
+    return config
+
+def run_experiment(config: Dict[str, Any]):
+    """執行實驗
+    
+    Args:
+        config: 實驗配置
+    """
+    logger.info(f"開始實驗: {config['global']['experiment_name']}")
+    logger.info(f"使用設備: {config['global']['device']}")
+    
+    # 創建 SaveManager 實例
+    save_manager = SaveManager(config['global']['output_dir'])
+    
+    # 創建數據集和數據加載器
+    train_dataset, val_dataset, test_dataset, train_loader, val_loader, test_loader = (
+        dataset_factory.create_datasets_and_loaders(config)
+    )
+    logger.info(f"數據集已創建，訓練集大小: {len(train_dataset)}")
     
     # 創建模型
-    logger.info("初始化模型...")
-    try:
-        model = create_model(config)
-        logger.info(f"模型初始化成功: {type(model).__name__}")
-    except Exception as e:
-        logger.error(f"模型初始化失敗: {str(e)}")
-        raise
-    
-    # 數據適配（如果需要）
-    model_type = config['model'].get('type', 'swin_transformer').lower()
-    data_type = config['data'].get('type', 'audio').lower()
-    logger.info(f"模型類型: {model_type}, 數據類型: {data_type}")
-    
-    try:
-        train_loader, val_loader, test_loader = adapt_datasets_to_model(
-            model_type=model_type,
-            config=config,
-            train_loader=train_loader,
-            val_loader=val_loader,
-            test_loader=test_loader
-        )
-        logger.info("數據適配成功")
-    except Exception as e:
-        logger.warning(f"數據適配過程中出現警告: {str(e)}")
-    
-    # 載入檢查點（如果有）
-    if args.checkpoint:
-        logger.info(f"載入檢查點: {args.checkpoint}")
-        checkpoint = torch.load(args.checkpoint, map_location=device)
-        model.load_state_dict(checkpoint['model_state_dict'])
-    
-    # 移動模型到指定設備
-    model = model.to(device)
+    model = model_factory.create_model(config)
+    logger.info(f"模型已創建，類型: {config['model']['type']}")
     
     # 創建訓練器
-    logger.info("初始化訓練器...")
-    trainer = create_trainer(config, model, (train_loader, val_loader, test_loader))
+    trainer = trainer_factory.create_trainer(config, model, (train_loader, val_loader, test_loader))
+    logger.info("訓練器已創建")
     
-    # 訓練或評估
-    if args.eval_only:
-        logger.info("僅評估模式")
-        results = trainer.evaluate()
-        logger.info(f"評估結果: {results}")
-    else:
-        # 訓練模型 - 注意這裡不需要調用train方法，因為TrainerFactory已經處理了
-        logger.info("開始訓練...")
-        epochs = config['training'].get('epochs', 100)
-        save_every = config['training'].get('save_every', 10)
+    # 獲取並添加分析器回調
+    analyzer_callbacks = get_analyzer_callbacks_from_config(config)
+    if analyzer_callbacks:
+        trainer.add_callbacks(analyzer_callbacks)
+        logger.info(f"已添加 {len(analyzer_callbacks)} 個分析器回調")
         
-        # 從trainer獲取訓練結果
-        history = {
-            'train_loss': trainer.train_losses,
-            'val_loss': trainer.val_losses
-        }
-        
-        # 添加其他指標
-        if hasattr(trainer, 'metrics'):
-            for key, value in trainer.metrics.get('train', {}).items():
-                history[f'train_{key}'] = value
-            for key, value in trainer.metrics.get('val', {}).items():
-                history[f'val_{key}'] = value
-        
-        # 保存訓練歷史和最終模型
-        save_model(model, model_dir, experiment_id, epochs)
-        
-        # 繪製訓練曲線
-        plot_training_curves(history, results_dir, experiment_id)
-        
-        # 評估最終模型
-        logger.info("評估最終模型...")
-        results = {'val_loss': trainer.best_val_loss}
-        if hasattr(trainer, 'test_results'):
-            results.update(trainer.test_results)
-        logger.info(f"最終評估結果: {results}")
+    # 執行訓練
+    results = trainer.train(train_loader, val_loader, test_loader)
     
-    logger.info(f"實驗 {experiment_id} 完成")
+    # 使用 SaveManager 保存訓練結果
+    results_path = save_manager.save_results(results)
     
-    # 保存完整配置和結果
-    final_results = {
-        "experiment_id": experiment_id,
-        "config": config,
-        "results": results,
-        "completed_at": datetime.now().isoformat()
-    }
-    
-    with open(os.path.join(experiment_dir, "results.json"), "w") as f:
-        json.dump(final_results, f, indent=2)
-    
-    logger.info(f"結果已保存到 {experiment_dir}/results.json")
+    logger.info(f"實驗完成，結果已保存到 {results_path}")
     
     return results
 
-
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        logging.error(f"執行過程中發生錯誤: {str(e)}", exc_info=True)
-        sys.exit(1) 
+if __name__ == '__main__':
+    args = parse_args()
+    config = load_config(args.config)
+    config = setup_experiment(config, args)
+    run_experiment(config) 

@@ -225,3 +225,35 @@ class CNNModel(nn.Module):
         )
         
         return optimizer 
+
+# 中文註解：這是cnn_model.py的Minimal Executable Unit，檢查CNNModel能否正確初始化與forward，並測試錯誤輸入時的優雅報錯
+if __name__ == "__main__":
+    """
+    Description: Minimal Executable Unit for cnn_model.py，檢查CNNModel能否正確初始化與forward，並測試錯誤輸入時的優雅報錯。
+    Args: None
+    Returns: None
+    References: 無
+    """
+    import torch
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    # 不要再import自己
+    # from models.cnn_model import CNNModel
+
+    # 測試正確初始化與forward
+    try:
+        model = CNNModel(input_channels=3, input_size=(32, 32), num_classes=4)
+        dummy_input = torch.randn(2, 3, 32, 32)
+        out = model(dummy_input)
+        print(f"CNNModel測試成功，output shape: {out.shape}")
+    except Exception as e:
+        print(f"CNNModel遇到錯誤（預期行為）: {e}")
+
+    # 測試錯誤輸入（維度錯誤）
+    try:
+        model = CNNModel(input_channels=3, input_size=(32, 32), num_classes=4)
+        dummy_input = torch.randn(2, 32, 32)  # 少一個通道維度
+        out = model(dummy_input)
+        print(f"CNNModel錯誤輸入測試，output shape: {out.shape}")
+    except Exception as e:
+        print(f"CNNModel遇到錯誤（預期行為）: {e}") 

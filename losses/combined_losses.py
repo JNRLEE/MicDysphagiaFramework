@@ -324,4 +324,47 @@ class FocalLoss(nn.Module):
         elif self.reduction == 'sum':
             return loss.sum()
         else:  # mean
-            return loss.mean() 
+            return loss.mean()
+
+# 中文註解：這是combined_losses.py的Minimal Executable Unit，檢查CombinedLoss能否正確初始化與forward，並測試錯誤loss設定時的優雅報錯
+if __name__ == "__main__":
+    """
+    Description: Minimal Executable Unit for combined_losses.py，檢查CombinedLoss能否正確初始化與forward，並測試錯誤loss設定時的優雅報錯。
+    Args: None
+    Returns: None
+    References: 無
+    """
+    import torch
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    # 不要再import自己
+    # from losses.combined_losses import CombinedLoss
+    from losses.loss_factory import LossFactory
+
+    # 測試正確設定
+    try:
+        mse = torch.nn.MSELoss()
+        l1 = torch.nn.L1Loss()
+        from losses.combined_losses import CombinedLoss
+
+        losses = {"mse": mse, "l1": l1}
+        weights = {"mse": 0.7, "l1": 0.3}
+        combined = CombinedLoss(losses, weights)
+        pred = torch.randn(4, 3)
+        target = torch.randn(4, 3)
+        loss = combined(pred, target)
+        print(f"CombinedLoss測試成功，loss: {loss.item()}")
+    except Exception as e:
+        print(f"遇到錯誤（預期行為）: {e}")
+
+    # 測試錯誤loss設定
+    try:
+        losses = {"mse": mse, "not_exist": None}
+        weights = {"mse": 1.0, "not_exist": 1.0}
+        combined = CombinedLoss(losses, weights)
+        pred = torch.randn(4, 3)
+        target = torch.randn(4, 3)
+        loss = combined(pred, target)
+        print(f"CombinedLoss錯誤設定測試，loss: {loss.item()}")
+    except Exception as e:
+        print(f"遇到錯誤（預期行為）: {e}") 

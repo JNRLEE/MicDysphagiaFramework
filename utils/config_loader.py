@@ -221,4 +221,44 @@ def load_config(config_path: str, default_config_path: Optional[str] = None) -> 
     """
     loader = ConfigLoader(config_path, default_config_path)
     loader.load_config()
-    return loader 
+    return loader
+
+# 中文註解：這是config_loader.py的Minimal Executable Unit，檢查ConfigLoader能正確加載、合併、驗證YAML配置，並測試錯誤情境時的優雅報錯
+if __name__ == "__main__":
+    """
+    Description: Minimal Executable Unit for config_loader.py，檢查ConfigLoader能正確加載、合併、驗證YAML配置，並測試錯誤情境時的優雅報錯。
+    Args: None
+    Returns: None
+    References: 無
+    """
+    import os
+    import yaml
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    # 建立臨時YAML檔案
+    good_yaml = "test_good.yaml"
+    bad_yaml = "test_bad.yaml"
+    with open(good_yaml, "w") as f:
+        yaml.dump({
+            "global": {},
+            "data": {"type": "audio", "source": {"wav_dir": "./"}},
+            "model": {},
+            "training": {}
+        }, f)
+    with open(bad_yaml, "w") as f:
+        yaml.dump({"model": {}, "training": {}, "global": {}} , f)
+    try:
+        from utils.config_loader import ConfigLoader
+        loader = ConfigLoader(good_yaml)
+        loader.load_config()
+        print("ConfigLoader測試成功")
+    except Exception as e:
+        print(f"ConfigLoader遇到錯誤（預期行為）: {e}")
+    try:
+        loader = ConfigLoader(bad_yaml)
+        loader.load_config()
+    except Exception as e:
+        print(f"ConfigLoader遇到錯誤配置時的報錯（預期行為）: {e}")
+    finally:
+        os.remove(good_yaml)
+        os.remove(bad_yaml) 

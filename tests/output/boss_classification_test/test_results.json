@@ -1,0 +1,21 @@
+{
+  "test_time": "2025-04-28 18:09:28",
+  "config_path": "/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/config/boss_custom_classification.yaml",
+  "custom_classification_enabled": true,
+  "total_patients": 99,
+  "total_classes": 5,
+  "class_names": [
+    "重度吞嚥障礙",
+    "吞嚥障礙",
+    "無OR 輕微吞嚥障礙",
+    "nan",
+    "正常"
+  ],
+  "dataset_size": 20,
+  "class_counts": {
+    "1": 6,
+    "2": 14
+  },
+  "model_type": "swin_transformer",
+  "model_num_classes": 5
+}

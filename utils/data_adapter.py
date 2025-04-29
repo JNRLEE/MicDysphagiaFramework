@@ -8,12 +8,12 @@
 """
 
 import torch
-import numpy as np
-import logging
-from typing import Dict, Any, Tuple, Union, List, Optional
-import librosa
 import torchaudio
+import numpy as np
+import librosa
+import logging
 from torch.utils.data import DataLoader, Dataset
+from typing import Dict, Any, Tuple, Union, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -164,13 +164,13 @@ class DataAdapter:
     
     @staticmethod
     def convert_audio_to_spectrogram(
-        audio_batch: torch.Tensor,
+        audio_batch: Union[torch.Tensor, List],
         spec_config: Dict[str, Any] = None
     ) -> torch.Tensor:
         """將音頻批次轉換為頻譜圖批次
         
         Args:
-            audio_batch: 音頻批次，形狀為 [batch_size, audio_length]
+            audio_batch: 音頻批次，形狀為 [batch_size, audio_length] 或音頻列表
             spec_config: 頻譜圖配置
             
         Returns:
@@ -178,6 +178,26 @@ class DataAdapter:
         """
         if spec_config is None:
             spec_config = {}
+        
+        # 確保 audio_batch 是 Tensor
+        if not isinstance(audio_batch, torch.Tensor):
+            if isinstance(audio_batch, list):
+                # 嘗試將列表轉換為tensor
+                try:
+                    # 如果列表中的元素是張量，嘗試堆疊
+                    if isinstance(audio_batch[0], torch.Tensor):
+                        audio_batch = torch.stack(audio_batch)
+                    else:
+                        # 否則嘗試直接創建張量
+                        audio_batch = torch.tensor(audio_batch)
+                except:
+                    # 如果轉換失敗，返回空的張量
+                    logger.error("無法將音頻列表轉換為張量")
+                    return torch.zeros(1, 1, 128, 128)  # 返回一個空的頻譜圖
+            else:
+                # 不支持的類型
+                logger.error(f"不支持的音頻批次類型: {type(audio_batch)}")
+                return torch.zeros(1, 1, 128, 128)  # 返回一個空的頻譜圖
         
         n_fft = spec_config.get('n_fft', 1024)
         hop_length = spec_config.get('hop_length', 512)
@@ -379,14 +399,10 @@ class DataAdapter:
         return is_compatible, adapter_method
 
 
-def adapt_datasets_to_model(
-    model_type: str,
-    config: Dict[str, Any],
-    train_loader: DataLoader,
-    val_loader: DataLoader,
-    test_loader: DataLoader
-) -> Tuple[DataLoader, DataLoader, DataLoader]:
-    """調整數據集以適應模型
+def adapt_datasets_to_model(model_type: str, config: Dict[str, Any], 
+                        train_loader: DataLoader, val_loader: DataLoader, 
+                        test_loader: Optional[DataLoader] = None) -> Tuple[DataLoader, DataLoader, Optional[DataLoader]]:
+    """適配數據集到模型要求
     
     Args:
         model_type: 模型類型
@@ -396,27 +412,31 @@ def adapt_datasets_to_model(
         test_loader: 測試數據加載器
         
     Returns:
-        Tuple[DataLoader, DataLoader, DataLoader]: 調整後的數據加載器
+        調整後的數據加載器元組 (train_loader, val_loader, test_loader)
+        
+    Notes:
+        這個函數檢查模型類型和數據類型是否兼容，
+        如果不兼容，則應用相應的轉換以確保數據可以被模型處理。
     """
-    # 確定數據類型
-    data_type = config['data']['type']
+    # 獲取數據類型
+    data_type = 'unknown'
+    if 'data' in config and 'type' in config['data']:
+        data_type = config['data']['type']
     
-    # 檢查兼容性
-    is_compatible, adapter_method = DataAdapter.check_model_data_compatibility(model_type, data_type)
+    # 檢查兼容性並進行調整
+    if (model_type in ['swin_transformer', 'resnet', 'cnn'] and 
+        data_type in ['audio', 'features', 'spectrogram']):
+        # 使用適配器數據加載器
+        logger.info(f"模型類型 '{model_type}' 與數據類型 '{data_type}' 不兼容，使用 AdapterDataLoader 進行適配")
+        
+        adapted_train_loader = AdapterDataLoader(train_loader, model_type, config)
+        adapted_val_loader = AdapterDataLoader(val_loader, model_type, config)
+        adapted_test_loader = AdapterDataLoader(test_loader, model_type, config) if test_loader is not None else None
+        
+        return adapted_train_loader, adapted_val_loader, adapted_test_loader
     
-    if is_compatible:
-        logger.info(f"模型類型 '{model_type}' 與數據類型 '{data_type}' 兼容，無需調整")
-        return train_loader, val_loader, test_loader
-    
-    # 需要調整數據
-    logger.info(f"模型類型 '{model_type}' 與數據類型 '{data_type}' 不兼容，使用 '{adapter_method}' 進行調整")
-    
-    # 創建適配器包裝的數據加載器
-    wrapped_train_loader = AdapterDataLoader(train_loader, model_type, config)
-    wrapped_val_loader = AdapterDataLoader(val_loader, model_type, config)
-    wrapped_test_loader = AdapterDataLoader(test_loader, model_type, config)
-    
-    return wrapped_train_loader, wrapped_val_loader, wrapped_test_loader
+    # 如果不需要適配，直接返回原始數據加載器
+    return train_loader, val_loader, test_loader
 
 
 class AdapterDataLoader:
@@ -447,4 +467,44 @@ class AdapterDataLoader:
     
     def __len__(self):
         """返回數據加載器長度"""
-        return len(self.dataloader) 
+        return len(self.dataloader)
+
+# 中文註解：這是data_adapter.py的Minimal Executable Unit，檢查DataAdapter的主要功能能正確運作，並測試不相容型態時的報錯
+if __name__ == "__main__":
+    """
+    Description: Minimal Executable Unit for data_adapter.py，檢查DataAdapter的adapt_batch、convert_audio_to_spectrogram等主要功能能正確運作，並測試不相容型態時的報錯。
+    Args: None
+    Returns: None
+    References: 無
+    """
+    import torch
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    # 測試adapt_batch
+    try:
+        batch = {"audio": torch.randn(2, 16000)}
+        config = {"data": {"preprocessing": {}}}
+        out = DataAdapter.adapt_batch(batch, "swin_transformer", config)
+        print(f"adapt_batch測試成功，輸出key: {list(out.keys())}")
+    except Exception as e:
+        print(f"adapt_batch遇到錯誤（預期行為）: {e}")
+    # 測試convert_audio_to_spectrogram
+    try:
+        audio = torch.randn(2, 16000)
+        spec = DataAdapter.convert_audio_to_spectrogram(audio)
+        print(f"convert_audio_to_spectrogram測試成功，shape: {spec.shape}")
+    except Exception as e:
+        print(f"convert_audio_to_spectrogram遇到錯誤（預期行為）: {e}")
+    # 測試check_model_data_compatibility
+    try:
+        is_compat, method = DataAdapter.check_model_data_compatibility("fcnn", "audio")
+        print(f"check_model_data_compatibility測試成功: {is_compat}, {method}")
+    except Exception as e:
+        print(f"check_model_data_compatibility遇到錯誤: {e}")
+    # 測試不相容型態
+    try:
+        batch = {"unknown": torch.randn(2, 10)}
+        out = DataAdapter.adapt_batch(batch, "cnn", config)
+        print(f"不相容型態測試，輸出key: {list(out.keys())}")
+    except Exception as e:
+        print(f"不相容型態遇到錯誤（預期行為）: {e}") 

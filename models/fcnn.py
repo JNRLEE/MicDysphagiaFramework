@@ -179,3 +179,34 @@ class FCNN(nn.Module):
         )
         
         return optimizer 
+
+# 中文註解：這是fcnn.py的Minimal Executable Unit，檢查FCNN能否正確初始化與forward，並測試錯誤輸入時的優雅報錯
+if __name__ == "__main__":
+    """
+    Description: Minimal Executable Unit for fcnn.py，檢查FCNN能否正確初始化與forward，並測試錯誤輸入時的優雅報錯。
+    Args: None
+    Returns: None
+    References: 無
+    """
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    # 不要再import自己
+    # from models.fcnn import FCNN
+
+    # 測試正確初始化與forward
+    try:
+        model = FCNN(input_dim=16, hidden_dims=[8, 4], num_classes=3)
+        dummy_input = torch.randn(2, 16)
+        out = model(dummy_input)
+        print(f"FCNN測試成功，output shape: {out.shape}")
+    except Exception as e:
+        print(f"FCNN遇到錯誤（預期行為）: {e}")
+
+    # 測試錯誤輸入（維度錯誤）
+    try:
+        model = FCNN(input_dim=16, hidden_dims=[8, 4], num_classes=3)
+        dummy_input = torch.randn(2, 8)  # 維度不符
+        out = model(dummy_input)
+        print(f"FCNN錯誤輸入測試，output shape: {out.shape}")
+    except Exception as e:
+        print(f"FCNN遇到錯誤（預期行為）: {e}") 

@@ -47,8 +47,8 @@ model:
     is_classification: false
 
 training:
-  epochs: 50
-  save_every: 10
+  epochs: 6
+  save_every: 3
   early_stopping:
     enabled: true
     patience: 10

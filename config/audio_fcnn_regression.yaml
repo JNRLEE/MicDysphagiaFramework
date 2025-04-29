@@ -10,7 +10,7 @@ global:
 data:
   type: 'audio'
   source:
-    wav_dir: 'tests/dataloader_test/dataset_test'
+    wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
   preprocessing:
     audio:
       sr: 16000
@@ -55,9 +55,10 @@ model:
     is_classification: false
     batch_norm: true
 
+
 training:
-  epochs: 50
-  save_every: 10
+  epochs: 6
+  save_every: 3
   early_stopping:
     enabled: true
     patience: 10

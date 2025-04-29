@@ -36,6 +36,20 @@ class ModelFactory:
         visual_prompting_config = model_config.get('visual_prompting', {})
         backbone_config = model_config.get('backbone', {})
         
+        # 檢查是否使用自定義分類
+        custom_classification_config = config.get('data', {}).get('filtering', {}).get('custom_classification', {})
+        use_custom_classification = custom_classification_config.get('enabled', False)
+        
+        # 如果啟用了自定義分類，從配置中動態覆蓋num_classes
+        if use_custom_classification:
+            # 需要導入CustomClassificationLoader以獲取類別數
+            from utils.custom_classification_loader import CustomClassificationLoader
+            custom_classifier = CustomClassificationLoader(config)
+            num_classes = custom_classifier.get_total_classes()
+            if num_classes > 0:
+                model_params['num_classes'] = num_classes
+                logger.info(f"使用自定義分類，將類別數設置為 {num_classes}")
+        
         # 根據模型類型創建對應的模型
         if model_type == 'swin_transformer':
             return ModelFactory._create_swin_transformer(config)
@@ -64,6 +78,10 @@ class ModelFactory:
         model_params = model_config.get('parameters', {})
         visual_prompting_config = model_config.get('visual_prompting', {})
         backbone_config = model_config.get('backbone', {})
+        
+        # 檢查是否使用自定義分類
+        custom_classification_config = config.get('data', {}).get('filtering', {}).get('custom_classification', {})
+        use_custom_classification = custom_classification_config.get('enabled', False)
         
         # 提取參數
         model_name = model_params.get('model_name', 'swin_tiny_patch4_window7_224')
@@ -117,6 +135,10 @@ class ModelFactory:
         model_config = config['model']
         model_params = model_config.get('parameters', {})
         
+        # 檢查是否使用自定義分類
+        custom_classification_config = config.get('data', {}).get('filtering', {}).get('custom_classification', {})
+        use_custom_classification = custom_classification_config.get('enabled', False)
+        
         # 提取參數
         input_dim = model_params.get('input_dim', 1024)
         hidden_dims = model_params.get('hidden_layers', [512, 256])
@@ -154,6 +176,10 @@ class ModelFactory:
         model_config = config['model']
         model_params = model_config.get('parameters', {})
         backbone_config = model_config.get('backbone', {})
+        
+        # 檢查是否使用自定義分類
+        custom_classification_config = config.get('data', {}).get('filtering', {}).get('custom_classification', {})
+        use_custom_classification = custom_classification_config.get('enabled', False)
         
         # 提取參數
         model_name = model_params.get('model_name', 'resnet50')
@@ -197,6 +223,10 @@ class ModelFactory:
         model_config = config['model']
         model_params = model_config.get('parameters', {})
         
+        # 檢查是否使用自定義分類
+        custom_classification_config = config.get('data', {}).get('filtering', {}).get('custom_classification', {})
+        use_custom_classification = custom_classification_config.get('enabled', False)
+        
         # 提取參數
         input_channels = model_params.get('input_channels', 3)
         input_size = model_params.get('input_size', (224, 224))
@@ -237,4 +267,46 @@ def create_model(config: Dict[str, Any]) -> Any:
     Returns:
         Any: 創建的模型實例
     """
-    return ModelFactory.create_model(config) 
+    return ModelFactory.create_model(config)
+
+# 中文註解：這是model_factory.py的Minimal Executable Unit，檢查ModelFactory能否正確創建模型，並測試錯誤type時的優雅報錯
+if __name__ == "__main__":
+    """
+    Description: Minimal Executable Unit for model_factory.py，檢查ModelFactory能否正確創建模型，並測試錯誤type時的優雅報錯。
+    Args: None
+    Returns: None
+    References: 無
+    """
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    # 不要再import自己
+    # from models.model_factory import ModelFactory
+
+    # 測試正確type
+    try:
+        config = {
+            "model": {
+                "type": "cnn",
+                "parameters": {
+                    "input_channels": 3,
+                    "input_size": (16, 16),
+                    "num_classes": 2
+                }
+            }
+        }
+        model = ModelFactory.create_model(config)
+        print(f"ModelFactory測試成功，模型類型: {type(model).__name__}")
+    except Exception as e:
+        print(f"ModelFactory遇到錯誤（預期行為）: {e}")
+
+    # 測試錯誤type
+    try:
+        config = {
+            "model": {
+                "type": "not_exist_model",
+                "parameters": {}
+            }
+        }
+        model = ModelFactory.create_model(config)
+    except Exception as e:
+        print(f"ModelFactory遇到錯誤type時的報錯（預期行為）: {e}") 

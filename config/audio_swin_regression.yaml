@@ -1,4 +1,6 @@
-#python scripts/run_experiments.py --config config/audio_swin_regression.yaml
+# python scripts/run_experiments.py --config config/audio_swin_regression.yaml
+# conda activate micdys && python MicDysphagiaFramework/scripts/run_experiments.py --config MicDysphagiaFramework/config/audio_swin_regression.yaml
+# python -m scripts.run_experiments --config config/audio_swin_regression.yaml
 
 global:
   experiment_name: 'audio_swin_regression'
@@ -10,7 +12,7 @@ global:
 data:
   type: 'audio'
   source:
-    wav_dir: 'tests/dataloader_test/dataset_test'
+    wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
   preprocessing:
     audio:
       sr: 16000
@@ -61,8 +63,8 @@ model:
     enabled: false
 
 training:
-  epochs: 50
-  save_every: 10
+  epochs: 2  # 減少訓練epoch數，加快測試
+  save_every: 1
   early_stopping:
     enabled: true
     patience: 10
@@ -86,3 +88,19 @@ training:
 evaluation:
   metrics: ['mse', 'mae', 'r2']  # 回歸評估指標
   log_predictions: true 
+
+# SBP分析器配置
+analysis:
+  enabled: true
+  output_dir: 'results'  # 明確設置輸出目錄
+  model_analytics:
+    enabled: true
+    save_frequency: 1   # 每個 epoch 保存一次
+    monitored_layers:   # 監控特定層的激活值
+      - 'model.layers.0'    # 首層
+      - 'model.layers.3'    # 末層
+      - 'head'              # 輸出頭
+    monitored_params:   # 監控特定參數的梯度
+      - 'model.layers.0.blocks.0.mlp.fc1.weight'
+      - 'model.layers.3.blocks.0.mlp.fc1.weight'
+      - 'head.weight' 

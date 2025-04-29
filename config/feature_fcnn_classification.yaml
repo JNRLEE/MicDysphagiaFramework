@@ -10,7 +10,7 @@ global:
 data:
   type: 'feature'
   source:
-    feature_dir: 'tests/dataloader_test/dataset_test'
+    feature_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
     feature_extension: 'npz'
   preprocessing:
     features:
@@ -52,15 +52,15 @@ model:
   parameters:
     input_dim: 1024
     hidden_layers: [512, 256, 128]
-    num_classes: 1
+    num_classes: 10
     dropout_rate: 0.3
     activation: 'relu'
     is_classification: false
     batch_norm: true
 
 training:
-  epochs: 50
-  save_every: 10
+  epochs: 6
+  save_every: 3
   early_stopping:
     enabled: true
     patience: 8
