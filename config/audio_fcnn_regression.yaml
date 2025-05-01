@@ -1,0 +1,84 @@
+#python scripts/run_experiments.py --config config/audio_fcnn_regression.yaml
+
+global:
+  experiment_name: 'audio_fcnn_regression'
+  seed: 42
+  debug: false
+  device: 'auto'
+  output_dir: 'results'
+
+data:
+  type: 'audio'
+  source:
+    wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
+  preprocessing:
+    audio:
+      sr: 16000
+      duration: 5
+      normalize: true
+    spectrogram:
+      method: 'mel'
+      n_mels: 128
+      n_fft: 1024
+      hop_length: 512
+      power: 2.0
+      normalized: true
+  filtering:
+    task_type: 'regression'  # 回歸任務
+    class_config:  # 只用於過濾不需要的動作類型
+      NoMovement: 1
+      DrySwallow: 1
+      Cracker: 1
+      Jelly: 1
+      WaterDrinking: 1
+
+  splits:
+    train_ratio: 0.7
+    val_ratio: 0.15
+    test_ratio: 0.15
+    split_by_patient: true
+    split_seed: 42
+  dataloader:
+    batch_size: 16
+    num_workers: 2
+    pin_memory: true
+    drop_last: false
+
+model:
+  type: 'fcnn'
+  parameters:
+    input_dim: 1024
+    hidden_layers: [512, 256, 128]
+    num_classes: 1
+    dropout_rate: 0.3
+    activation: 'relu'
+    is_classification: false
+    batch_norm: true
+
+
+training:
+  epochs: 6
+  save_every: 3
+  early_stopping:
+    enabled: true
+    patience: 10
+    min_delta: 0.001
+  loss:
+    type: 'MSELoss'  # 回歸損失
+    parameters:
+      reduction: 'mean'
+  optimizer:
+    type: 'Adam'
+    parameters:
+      lr: 0.001
+      weight_decay: 0.0001
+  scheduler:
+    type: 'ReduceLROnPlateau'
+    parameters:
+      mode: 'min'
+      factor: 0.5
+      patience: 5
+
+evaluation:
+  metrics: ['mse', 'mae', 'r2']  # 回歸評估指標
+  log_predictions: true 

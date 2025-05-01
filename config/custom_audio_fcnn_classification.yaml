@@ -1,0 +1,139 @@
+#python scripts/run_experiments.py --config config/custom_audio_fcnn_classification.yaml
+global:
+  experiment_name: 'custom_audio_fcnn_classification'
+  seed: 42
+  debug: false
+  device: 'auto'
+  output_dir: 'results'
+
+data:
+  type: 'audio'
+  source:
+    # 使用Google Drive的目錄路徑
+    #wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/WavData/Processed(Cut)'
+    # 使用本機的目錄路徑
+    wav_dir: 'G:\My Drive\MicforDysphagia\WavData\Processed(Cut)'
+  preprocessing:
+    audio:
+      sr: 16000
+      duration: 5
+      normalize: true
+      # 新增靜音檢測選項
+      remove_silence: false
+      # 新增去噪選項
+      denoise: false
+    # 新增特徵提取區塊
+    features:
+      method: 'mel_spectrogram'  # 使用mel頻譜圖特徵
+      n_mels: 128  # Mel頻率數量，這將成為FCNN的input_dim
+      n_fft: 1024
+      hop_length: 512
+      power: 2.0
+      normalized: true
+      log_mel: true  # 對數變換
+      target_duration_sec: 5  # 確保所有特徵時間長度一致
+      scaling_method: 'standard'  # 標準化特徵 (zero-mean, unit-variance)
+  filtering:
+    # 自定義分類設定 - 只從老闆的Excel檔案中取分類
+    custom_classification:
+      enabled: true # 啟用自定義分類
+      # 使用Google Drive的目錄路徑
+      #excel_path: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/data/吞嚥聲音名單(共同編輯).xlsx' # Excel檔案路徑
+      # 使用本機的目錄路徑
+      excel_path: 'G:\My Drive\MicforDysphagia\ProjectDeveloper\MicDysphagiaFramework\data\吞嚥聲音名單(共同編輯).xlsx' # Excel檔案路徑
+      patient_id_column: 'A' # 患者ID所在欄位
+      class_column: 'P' # 分類所在欄位
+      # 新增動作類型過濾設定
+      class_config:
+        NoMovement: 0
+        DrySwallow: 0
+        Cracker: 0
+        Jelly: 1
+        WaterDrinking: 0
+      # 新增排除特定分類類別設定
+      exclude_classes:
+        - 'nan'  # 排除nan類別
+
+    # 這些原始分類設定會被忽略
+    score_thresholds:
+      normal: 0  # score <= 0 為正常人
+      patient: 9  # score >= 9 為病人
+    class_config:
+      NoMovement: 1
+      DrySwallow: 1
+      Cracker: 1
+      Jelly: 1
+      WaterDrinking: 1
+    subject_source:
+      normal:
+        include_N: 1  # 包含 N 開頭的正常人
+        include_P: 1  # 包含 P 開頭的正常人
+      patient:
+        include_N: 0  # 不包含 N 開頭的病人
+        include_P: 1  # 包含 P 開頭的病人
+    task_type: 'classification'  # 分類任務
+
+  splits:
+    train_ratio: 0.7
+    val_ratio: 0.15
+    test_ratio: 0.15
+    split_by_patient: true
+    split_seed: 42
+  dataloader:
+    batch_size: 16
+    num_workers: 2
+    pin_memory: true
+    drop_last: false
+
+model:
+  type: 'fcnn'
+  parameters:
+    input_dim: 128  # 需要和features.n_mels的值保持一致
+    hidden_layers: [512, 256, 128]
+    num_classes: 10
+    dropout_rate: 0.3
+    activation: 'relu'
+    is_classification: true
+    batch_norm: true
+
+training:
+  epochs: 100
+  save_every: 10
+  early_stopping:
+    enabled: true
+    patience: 8
+    min_delta: 0.001
+  loss:
+    type: 'CrossEntropyLoss'  # （適用於分類任務）
+    parameters:
+      reduction: 'mean'
+  # loss:
+  #   combined:
+  #     mse:
+  #       type: 'MSELoss'
+  #       weight: 0.6
+  #       parameters:
+  #         reduction: 'mean'
+  #     ranking:
+  #       type: 'ListMLELoss'
+  #       weight: 0.4
+  #       parameters:
+  #         batch_size_per_group: 8
+  #         temperature: 1.0
+  optimizer:
+    type: 'Adam'
+    parameters:
+      lr: 0.0005
+      weight_decay: 0.0001
+  scheduler:
+    type: 'ReduceLROnPlateau'
+    parameters:
+      mode: 'min'
+      factor: 0.5
+      patience: 5
+      min_lr: 0.00001
+
+evaluation:
+  metrics: ['accuracy', 'f1_score', 'precision', 'recall']
+  log_predictions: true
+  feature_importance: true 

@@ -1,0 +1,50 @@
+{
+  "standard_losses": {
+    "MSELoss": 20.628215154012043,
+    "L1Loss": 3.619358857472738,
+    "BCELoss": 2.4843223889668784,
+    "BCEWithLogitsLoss": 2.48433526357015,
+    "SmoothL1Loss": 3.1593119303385415,
+    "HuberLoss": 3.1593119303385415
+  },
+  "ranking_losses": {
+    "PairwiseRankingLoss_score_diff": 2.140101750691732,
+    "PairwiseRankingLoss_random": 1.96738600730896,
+    "PairwiseRankingLoss_hard_negative": 3.8981734116872153,
+    "ListwiseRankingLoss_listnet": 2.9991935888926187,
+    "ListwiseRankingLoss_listmle": 199.7096150716146,
+    "ListwiseRankingLoss_approxndcg": 0.24756884574890137,
+    "LambdaRankLoss": 0.005959661211818457
+  },
+  "combined_losses": {
+    "MSE+L1": {
+      "combined": 15.52555783589681,
+      "individual": {
+        "mse": 20.628215154012043,
+        "l1": 3.619358857472738
+      }
+    },
+    "MSE+PairwiseRanking": {
+      "combined": 11.387449900309244,
+      "individual": {
+        "mse": 20.628215154012043,
+        "pairwise": 2.146685322125753
+      }
+    },
+    "MSE+ListwiseRanking": {
+      "combined": 11.916140874226889,
+      "individual": {
+        "mse": 20.628215154012043,
+        "listwise": 3.579111099243164
+      }
+    },
+    "MSE+L1+PairwiseRanking": {
+      "combined": 9.833831787109375,
+      "individual": {
+        "mse": 20.628215154012043,
+        "l1": 3.619358857472738,
+        "pairwise": 2.146685163180033
+      }
+    }
+  }
+}

@@ -1,0 +1,2626 @@
+{
+  "model_type": "SwinTransformerModel",
+  "model_class": "SwinTransformerModel",
+  "total_parameters": 27618684,
+  "trainable_parameters": 27618684,
+  "layers": [
+    {
+      "name": "backbone",
+      "type": "SwinTransformer",
+      "parameters": 27519354,
+      "trainable_parameters": 27519354
+    },
+    {
+      "name": "backbone.features",
+      "type": "Sequential",
+      "parameters": 27517818,
+      "trainable_parameters": 27517818
+    },
+    {
+      "name": "backbone.features.0",
+      "type": "Sequential",
+      "parameters": 4896,
+      "trainable_parameters": 4896
+    },
+    {
+      "name": "backbone.features.0.0",
+      "type": "Conv2d",
+      "parameters": 4704,
+      "trainable_parameters": 4704
+    },
+    {
+      "name": "backbone.features.0.1",
+      "type": "Permute",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.0.2",
+      "type": "LayerNorm",
+      "parameters": 192,
+      "trainable_parameters": 192
+    },
+    {
+      "name": "backbone.features.1",
+      "type": "Sequential",
+      "parameters": 224694,
+      "trainable_parameters": 224694
+    },
+    {
+      "name": "backbone.features.1.0",
+      "type": "SwinTransformerBlock",
+      "parameters": 112347,
+      "trainable_parameters": 112347
+    },
+    {
+      "name": "backbone.features.1.0.norm1",
+      "type": "LayerNorm",
+      "parameters": 192,
+      "trainable_parameters": 192
+    },
+    {
+      "name": "backbone.features.1.0.attn",
+      "type": "ShiftedWindowAttention",
+      "parameters": 37755,
+      "trainable_parameters": 37755
+    },
+    {
+      "name": "backbone.features.1.0.attn.qkv",
+      "type": "Linear",
+      "parameters": 27936,
+      "trainable_parameters": 27936
+    },
+    {
+      "name": "backbone.features.1.0.attn.proj",
+      "type": "Linear",
+      "parameters": 9312,
+      "trainable_parameters": 9312
+    },
+    {
+      "name": "backbone.features.1.0.stochastic_depth",
+      "type": "StochasticDepth",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.1.0.norm2",
+      "type": "LayerNorm",
+      "parameters": 192,
+      "trainable_parameters": 192
+    },
+    {
+      "name": "backbone.features.1.0.mlp",
+      "type": "MLP",
+      "parameters": 74208,
+      "trainable_parameters": 74208
+    },
+    {
+      "name": "backbone.features.1.0.mlp.0",
+      "type": "Linear",
+      "parameters": 37248,
+      "trainable_parameters": 37248
+    },
+    {
+      "name": "backbone.features.1.0.mlp.1",
+      "type": "GELU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.1.0.mlp.2",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.1.0.mlp.3",
+      "type": "Linear",
+      "parameters": 36960,
+      "trainable_parameters": 36960
+    },
+    {
+      "name": "backbone.features.1.0.mlp.4",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.1.1",
+      "type": "SwinTransformerBlock",
+      "parameters": 112347,
+      "trainable_parameters": 112347
+    },
+    {
+      "name": "backbone.features.1.1.norm1",
+      "type": "LayerNorm",
+      "parameters": 192,
+      "trainable_parameters": 192
+    },
+    {
+      "name": "backbone.features.1.1.attn",
+      "type": "ShiftedWindowAttention",
+      "parameters": 37755,
+      "trainable_parameters": 37755
+    },
+    {
+      "name": "backbone.features.1.1.attn.qkv",
+      "type": "Linear",
+      "parameters": 27936,
+      "trainable_parameters": 27936
+    },
+    {
+      "name": "backbone.features.1.1.attn.proj",
+      "type": "Linear",
+      "parameters": 9312,
+      "trainable_parameters": 9312
+    },
+    {
+      "name": "backbone.features.1.1.stochastic_depth",
+      "type": "StochasticDepth",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.1.1.norm2",
+      "type": "LayerNorm",
+      "parameters": 192,
+      "trainable_parameters": 192
+    },
+    {
+      "name": "backbone.features.1.1.mlp",
+      "type": "MLP",
+      "parameters": 74208,
+      "trainable_parameters": 74208
+    },
+    {
+      "name": "backbone.features.1.1.mlp.0",
+      "type": "Linear",
+      "parameters": 37248,
+      "trainable_parameters": 37248
+    },
+    {
+      "name": "backbone.features.1.1.mlp.1",
+      "type": "GELU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.1.1.mlp.2",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.1.1.mlp.3",
+      "type": "Linear",
+      "parameters": 36960,
+      "trainable_parameters": 36960
+    },
+    {
+      "name": "backbone.features.1.1.mlp.4",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.2",
+      "type": "PatchMerging",
+      "parameters": 74496,
+      "trainable_parameters": 74496
+    },
+    {
+      "name": "backbone.features.2.reduction",
+      "type": "Linear",
+      "parameters": 73728,
+      "trainable_parameters": 73728
+    },
+    {
+      "name": "backbone.features.2.norm",
+      "type": "LayerNorm",
+      "parameters": 768,
+      "trainable_parameters": 768
+    },
+    {
+      "name": "backbone.features.3",
+      "type": "Sequential",
+      "parameters": 891756,
+      "trainable_parameters": 891756
+    },
+    {
+      "name": "backbone.features.3.0",
+      "type": "SwinTransformerBlock",
+      "parameters": 445878,
+      "trainable_parameters": 445878
+    },
+    {
+      "name": "backbone.features.3.0.norm1",
+      "type": "LayerNorm",
+      "parameters": 384,
+      "trainable_parameters": 384
+    },
+    {
+      "name": "backbone.features.3.0.attn",
+      "type": "ShiftedWindowAttention",
+      "parameters": 149238,
+      "trainable_parameters": 149238
+    },
+    {
+      "name": "backbone.features.3.0.attn.qkv",
+      "type": "Linear",
+      "parameters": 111168,
+      "trainable_parameters": 111168
+    },
+    {
+      "name": "backbone.features.3.0.attn.proj",
+      "type": "Linear",
+      "parameters": 37056,
+      "trainable_parameters": 37056
+    },
+    {
+      "name": "backbone.features.3.0.stochastic_depth",
+      "type": "StochasticDepth",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.3.0.norm2",
+      "type": "LayerNorm",
+      "parameters": 384,
+      "trainable_parameters": 384
+    },
+    {
+      "name": "backbone.features.3.0.mlp",
+      "type": "MLP",
+      "parameters": 295872,
+      "trainable_parameters": 295872
+    },
+    {
+      "name": "backbone.features.3.0.mlp.0",
+      "type": "Linear",
+      "parameters": 148224,
+      "trainable_parameters": 148224
+    },
+    {
+      "name": "backbone.features.3.0.mlp.1",
+      "type": "GELU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.3.0.mlp.2",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.3.0.mlp.3",
+      "type": "Linear",
+      "parameters": 147648,
+      "trainable_parameters": 147648
+    },
+    {
+      "name": "backbone.features.3.0.mlp.4",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.3.1",
+      "type": "SwinTransformerBlock",
+      "parameters": 445878,
+      "trainable_parameters": 445878
+    },
+    {
+      "name": "backbone.features.3.1.norm1",
+      "type": "LayerNorm",
+      "parameters": 384,
+      "trainable_parameters": 384
+    },
+    {
+      "name": "backbone.features.3.1.attn",
+      "type": "ShiftedWindowAttention",
+      "parameters": 149238,
+      "trainable_parameters": 149238
+    },
+    {
+      "name": "backbone.features.3.1.attn.qkv",
+      "type": "Linear",
+      "parameters": 111168,
+      "trainable_parameters": 111168
+    },
+    {
+      "name": "backbone.features.3.1.attn.proj",
+      "type": "Linear",
+      "parameters": 37056,
+      "trainable_parameters": 37056
+    },
+    {
+      "name": "backbone.features.3.1.stochastic_depth",
+      "type": "StochasticDepth",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.3.1.norm2",
+      "type": "LayerNorm",
+      "parameters": 384,
+      "trainable_parameters": 384
+    },
+    {
+      "name": "backbone.features.3.1.mlp",
+      "type": "MLP",
+      "parameters": 295872,
+      "trainable_parameters": 295872
+    },
+    {
+      "name": "backbone.features.3.1.mlp.0",
+      "type": "Linear",
+      "parameters": 148224,
+      "trainable_parameters": 148224
+    },
+    {
+      "name": "backbone.features.3.1.mlp.1",
+      "type": "GELU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.3.1.mlp.2",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.3.1.mlp.3",
+      "type": "Linear",
+      "parameters": 147648,
+      "trainable_parameters": 147648
+    },
+    {
+      "name": "backbone.features.3.1.mlp.4",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.4",
+      "type": "PatchMerging",
+      "parameters": 296448,
+      "trainable_parameters": 296448
+    },
+    {
+      "name": "backbone.features.4.reduction",
+      "type": "Linear",
+      "parameters": 294912,
+      "trainable_parameters": 294912
+    },
+    {
+      "name": "backbone.features.4.norm",
+      "type": "LayerNorm",
+      "parameters": 1536,
+      "trainable_parameters": 1536
+    },
+    {
+      "name": "backbone.features.5",
+      "type": "Sequential",
+      "parameters": 10658952,
+      "trainable_parameters": 10658952
+    },
+    {
+      "name": "backbone.features.5.0",
+      "type": "SwinTransformerBlock",
+      "parameters": 1776492,
+      "trainable_parameters": 1776492
+    },
+    {
+      "name": "backbone.features.5.0.norm1",
+      "type": "LayerNorm",
+      "parameters": 768,
+      "trainable_parameters": 768
+    },
+    {
+      "name": "backbone.features.5.0.attn",
+      "type": "ShiftedWindowAttention",
+      "parameters": 593388,
+      "trainable_parameters": 593388
+    },
+    {
+      "name": "backbone.features.5.0.attn.qkv",
+      "type": "Linear",
+      "parameters": 443520,
+      "trainable_parameters": 443520
+    },
+    {
+      "name": "backbone.features.5.0.attn.proj",
+      "type": "Linear",
+      "parameters": 147840,
+      "trainable_parameters": 147840
+    },
+    {
+      "name": "backbone.features.5.0.stochastic_depth",
+      "type": "StochasticDepth",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.0.norm2",
+      "type": "LayerNorm",
+      "parameters": 768,
+      "trainable_parameters": 768
+    },
+    {
+      "name": "backbone.features.5.0.mlp",
+      "type": "MLP",
+      "parameters": 1181568,
+      "trainable_parameters": 1181568
+    },
+    {
+      "name": "backbone.features.5.0.mlp.0",
+      "type": "Linear",
+      "parameters": 591360,
+      "trainable_parameters": 591360
+    },
+    {
+      "name": "backbone.features.5.0.mlp.1",
+      "type": "GELU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.0.mlp.2",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.0.mlp.3",
+      "type": "Linear",
+      "parameters": 590208,
+      "trainable_parameters": 590208
+    },
+    {
+      "name": "backbone.features.5.0.mlp.4",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.1",
+      "type": "SwinTransformerBlock",
+      "parameters": 1776492,
+      "trainable_parameters": 1776492
+    },
+    {
+      "name": "backbone.features.5.1.norm1",
+      "type": "LayerNorm",
+      "parameters": 768,
+      "trainable_parameters": 768
+    },
+    {
+      "name": "backbone.features.5.1.attn",
+      "type": "ShiftedWindowAttention",
+      "parameters": 593388,
+      "trainable_parameters": 593388
+    },
+    {
+      "name": "backbone.features.5.1.attn.qkv",
+      "type": "Linear",
+      "parameters": 443520,
+      "trainable_parameters": 443520
+    },
+    {
+      "name": "backbone.features.5.1.attn.proj",
+      "type": "Linear",
+      "parameters": 147840,
+      "trainable_parameters": 147840
+    },
+    {
+      "name": "backbone.features.5.1.stochastic_depth",
+      "type": "StochasticDepth",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.1.norm2",
+      "type": "LayerNorm",
+      "parameters": 768,
+      "trainable_parameters": 768
+    },
+    {
+      "name": "backbone.features.5.1.mlp",
+      "type": "MLP",
+      "parameters": 1181568,
+      "trainable_parameters": 1181568
+    },
+    {
+      "name": "backbone.features.5.1.mlp.0",
+      "type": "Linear",
+      "parameters": 591360,
+      "trainable_parameters": 591360
+    },
+    {
+      "name": "backbone.features.5.1.mlp.1",
+      "type": "GELU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.1.mlp.2",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.1.mlp.3",
+      "type": "Linear",
+      "parameters": 590208,
+      "trainable_parameters": 590208
+    },
+    {
+      "name": "backbone.features.5.1.mlp.4",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.2",
+      "type": "SwinTransformerBlock",
+      "parameters": 1776492,
+      "trainable_parameters": 1776492
+    },
+    {
+      "name": "backbone.features.5.2.norm1",
+      "type": "LayerNorm",
+      "parameters": 768,
+      "trainable_parameters": 768
+    },
+    {
+      "name": "backbone.features.5.2.attn",
+      "type": "ShiftedWindowAttention",
+      "parameters": 593388,
+      "trainable_parameters": 593388
+    },
+    {
+      "name": "backbone.features.5.2.attn.qkv",
+      "type": "Linear",
+      "parameters": 443520,
+      "trainable_parameters": 443520
+    },
+    {
+      "name": "backbone.features.5.2.attn.proj",
+      "type": "Linear",
+      "parameters": 147840,
+      "trainable_parameters": 147840
+    },
+    {
+      "name": "backbone.features.5.2.stochastic_depth",
+      "type": "StochasticDepth",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.2.norm2",
+      "type": "LayerNorm",
+      "parameters": 768,
+      "trainable_parameters": 768
+    },
+    {
+      "name": "backbone.features.5.2.mlp",
+      "type": "MLP",
+      "parameters": 1181568,
+      "trainable_parameters": 1181568
+    },
+    {
+      "name": "backbone.features.5.2.mlp.0",
+      "type": "Linear",
+      "parameters": 591360,
+      "trainable_parameters": 591360
+    },
+    {
+      "name": "backbone.features.5.2.mlp.1",
+      "type": "GELU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.2.mlp.2",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.2.mlp.3",
+      "type": "Linear",
+      "parameters": 590208,
+      "trainable_parameters": 590208
+    },
+    {
+      "name": "backbone.features.5.2.mlp.4",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.3",
+      "type": "SwinTransformerBlock",
+      "parameters": 1776492,
+      "trainable_parameters": 1776492
+    },
+    {
+      "name": "backbone.features.5.3.norm1",
+      "type": "LayerNorm",
+      "parameters": 768,
+      "trainable_parameters": 768
+    },
+    {
+      "name": "backbone.features.5.3.attn",
+      "type": "ShiftedWindowAttention",
+      "parameters": 593388,
+      "trainable_parameters": 593388
+    },
+    {
+      "name": "backbone.features.5.3.attn.qkv",
+      "type": "Linear",
+      "parameters": 443520,
+      "trainable_parameters": 443520
+    },
+    {
+      "name": "backbone.features.5.3.attn.proj",
+      "type": "Linear",
+      "parameters": 147840,
+      "trainable_parameters": 147840
+    },
+    {
+      "name": "backbone.features.5.3.stochastic_depth",
+      "type": "StochasticDepth",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.3.norm2",
+      "type": "LayerNorm",
+      "parameters": 768,
+      "trainable_parameters": 768
+    },
+    {
+      "name": "backbone.features.5.3.mlp",
+      "type": "MLP",
+      "parameters": 1181568,
+      "trainable_parameters": 1181568
+    },
+    {
+      "name": "backbone.features.5.3.mlp.0",
+      "type": "Linear",
+      "parameters": 591360,
+      "trainable_parameters": 591360
+    },
+    {
+      "name": "backbone.features.5.3.mlp.1",
+      "type": "GELU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.3.mlp.2",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.3.mlp.3",
+      "type": "Linear",
+      "parameters": 590208,
+      "trainable_parameters": 590208
+    },
+    {
+      "name": "backbone.features.5.3.mlp.4",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.4",
+      "type": "SwinTransformerBlock",
+      "parameters": 1776492,
+      "trainable_parameters": 1776492
+    },
+    {
+      "name": "backbone.features.5.4.norm1",
+      "type": "LayerNorm",
+      "parameters": 768,
+      "trainable_parameters": 768
+    },
+    {
+      "name": "backbone.features.5.4.attn",
+      "type": "ShiftedWindowAttention",
+      "parameters": 593388,
+      "trainable_parameters": 593388
+    },
+    {
+      "name": "backbone.features.5.4.attn.qkv",
+      "type": "Linear",
+      "parameters": 443520,
+      "trainable_parameters": 443520
+    },
+    {
+      "name": "backbone.features.5.4.attn.proj",
+      "type": "Linear",
+      "parameters": 147840,
+      "trainable_parameters": 147840
+    },
+    {
+      "name": "backbone.features.5.4.stochastic_depth",
+      "type": "StochasticDepth",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.4.norm2",
+      "type": "LayerNorm",
+      "parameters": 768,
+      "trainable_parameters": 768
+    },
+    {
+      "name": "backbone.features.5.4.mlp",
+      "type": "MLP",
+      "parameters": 1181568,
+      "trainable_parameters": 1181568
+    },
+    {
+      "name": "backbone.features.5.4.mlp.0",
+      "type": "Linear",
+      "parameters": 591360,
+      "trainable_parameters": 591360
+    },
+    {
+      "name": "backbone.features.5.4.mlp.1",
+      "type": "GELU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.4.mlp.2",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.4.mlp.3",
+      "type": "Linear",
+      "parameters": 590208,
+      "trainable_parameters": 590208
+    },
+    {
+      "name": "backbone.features.5.4.mlp.4",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.5",
+      "type": "SwinTransformerBlock",
+      "parameters": 1776492,
+      "trainable_parameters": 1776492
+    },
+    {
+      "name": "backbone.features.5.5.norm1",
+      "type": "LayerNorm",
+      "parameters": 768,
+      "trainable_parameters": 768
+    },
+    {
+      "name": "backbone.features.5.5.attn",
+      "type": "ShiftedWindowAttention",
+      "parameters": 593388,
+      "trainable_parameters": 593388
+    },
+    {
+      "name": "backbone.features.5.5.attn.qkv",
+      "type": "Linear",
+      "parameters": 443520,
+      "trainable_parameters": 443520
+    },
+    {
+      "name": "backbone.features.5.5.attn.proj",
+      "type": "Linear",
+      "parameters": 147840,
+      "trainable_parameters": 147840
+    },
+    {
+      "name": "backbone.features.5.5.stochastic_depth",
+      "type": "StochasticDepth",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.5.norm2",
+      "type": "LayerNorm",
+      "parameters": 768,
+      "trainable_parameters": 768
+    },
+    {
+      "name": "backbone.features.5.5.mlp",
+      "type": "MLP",
+      "parameters": 1181568,
+      "trainable_parameters": 1181568
+    },
+    {
+      "name": "backbone.features.5.5.mlp.0",
+      "type": "Linear",
+      "parameters": 591360,
+      "trainable_parameters": 591360
+    },
+    {
+      "name": "backbone.features.5.5.mlp.1",
+      "type": "GELU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.5.mlp.2",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.5.5.mlp.3",
+      "type": "Linear",
+      "parameters": 590208,
+      "trainable_parameters": 590208
+    },
+    {
+      "name": "backbone.features.5.5.mlp.4",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.6",
+      "type": "PatchMerging",
+      "parameters": 1182720,
+      "trainable_parameters": 1182720
+    },
+    {
+      "name": "backbone.features.6.reduction",
+      "type": "Linear",
+      "parameters": 1179648,
+      "trainable_parameters": 1179648
+    },
+    {
+      "name": "backbone.features.6.norm",
+      "type": "LayerNorm",
+      "parameters": 3072,
+      "trainable_parameters": 3072
+    },
+    {
+      "name": "backbone.features.7",
+      "type": "Sequential",
+      "parameters": 14183856,
+      "trainable_parameters": 14183856
+    },
+    {
+      "name": "backbone.features.7.0",
+      "type": "SwinTransformerBlock",
+      "parameters": 7091928,
+      "trainable_parameters": 7091928
+    },
+    {
+      "name": "backbone.features.7.0.norm1",
+      "type": "LayerNorm",
+      "parameters": 1536,
+      "trainable_parameters": 1536
+    },
+    {
+      "name": "backbone.features.7.0.attn",
+      "type": "ShiftedWindowAttention",
+      "parameters": 2366424,
+      "trainable_parameters": 2366424
+    },
+    {
+      "name": "backbone.features.7.0.attn.qkv",
+      "type": "Linear",
+      "parameters": 1771776,
+      "trainable_parameters": 1771776
+    },
+    {
+      "name": "backbone.features.7.0.attn.proj",
+      "type": "Linear",
+      "parameters": 590592,
+      "trainable_parameters": 590592
+    },
+    {
+      "name": "backbone.features.7.0.stochastic_depth",
+      "type": "StochasticDepth",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.7.0.norm2",
+      "type": "LayerNorm",
+      "parameters": 1536,
+      "trainable_parameters": 1536
+    },
+    {
+      "name": "backbone.features.7.0.mlp",
+      "type": "MLP",
+      "parameters": 4722432,
+      "trainable_parameters": 4722432
+    },
+    {
+      "name": "backbone.features.7.0.mlp.0",
+      "type": "Linear",
+      "parameters": 2362368,
+      "trainable_parameters": 2362368
+    },
+    {
+      "name": "backbone.features.7.0.mlp.1",
+      "type": "GELU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.7.0.mlp.2",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.7.0.mlp.3",
+      "type": "Linear",
+      "parameters": 2360064,
+      "trainable_parameters": 2360064
+    },
+    {
+      "name": "backbone.features.7.0.mlp.4",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.7.1",
+      "type": "SwinTransformerBlock",
+      "parameters": 7091928,
+      "trainable_parameters": 7091928
+    },
+    {
+      "name": "backbone.features.7.1.norm1",
+      "type": "LayerNorm",
+      "parameters": 1536,
+      "trainable_parameters": 1536
+    },
+    {
+      "name": "backbone.features.7.1.attn",
+      "type": "ShiftedWindowAttention",
+      "parameters": 2366424,
+      "trainable_parameters": 2366424
+    },
+    {
+      "name": "backbone.features.7.1.attn.qkv",
+      "type": "Linear",
+      "parameters": 1771776,
+      "trainable_parameters": 1771776
+    },
+    {
+      "name": "backbone.features.7.1.attn.proj",
+      "type": "Linear",
+      "parameters": 590592,
+      "trainable_parameters": 590592
+    },
+    {
+      "name": "backbone.features.7.1.stochastic_depth",
+      "type": "StochasticDepth",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.7.1.norm2",
+      "type": "LayerNorm",
+      "parameters": 1536,
+      "trainable_parameters": 1536
+    },
+    {
+      "name": "backbone.features.7.1.mlp",
+      "type": "MLP",
+      "parameters": 4722432,
+      "trainable_parameters": 4722432
+    },
+    {
+      "name": "backbone.features.7.1.mlp.0",
+      "type": "Linear",
+      "parameters": 2362368,
+      "trainable_parameters": 2362368
+    },
+    {
+      "name": "backbone.features.7.1.mlp.1",
+      "type": "GELU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.7.1.mlp.2",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.features.7.1.mlp.3",
+      "type": "Linear",
+      "parameters": 2360064,
+      "trainable_parameters": 2360064
+    },
+    {
+      "name": "backbone.features.7.1.mlp.4",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.norm",
+      "type": "LayerNorm",
+      "parameters": 1536,
+      "trainable_parameters": 1536
+    },
+    {
+      "name": "backbone.permute",
+      "type": "Permute",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.avgpool",
+      "type": "AdaptiveAvgPool2d",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.flatten",
+      "type": "Flatten",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "backbone.head",
+      "type": "Identity",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "head",
+      "type": "Sequential",
+      "parameters": 769,
+      "trainable_parameters": 769
+    },
+    {
+      "name": "head.0",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "head.1",
+      "type": "Linear",
+      "parameters": 769,
+      "trainable_parameters": 769
+    },
+    {
+      "name": "skip_connection",
+      "type": "Sequential",
+      "parameters": 98561,
+      "trainable_parameters": 98561
+    },
+    {
+      "name": "skip_connection.0",
+      "type": "Linear",
+      "parameters": 98432,
+      "trainable_parameters": 98432
+    },
+    {
+      "name": "skip_connection.1",
+      "type": "ReLU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "skip_connection.2",
+      "type": "Linear",
+      "parameters": 129,
+      "trainable_parameters": 129
+    }
+  ],
+  "parameters": [
+    {
+      "name": "backbone.features.0.0.weight",
+      "shape": [
+        96,
+        3,
+        4,
+        4
+      ],
+      "size": 4608,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.0.0.bias",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.0.2.weight",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.0.2.bias",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.0.norm1.weight",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.0.norm1.bias",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.0.attn.relative_position_bias_table",
+      "shape": [
+        169,
+        3
+      ],
+      "size": 507,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.0.attn.qkv.weight",
+      "shape": [
+        288,
+        96
+      ],
+      "size": 27648,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.0.attn.qkv.bias",
+      "shape": [
+        288
+      ],
+      "size": 288,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.0.attn.proj.weight",
+      "shape": [
+        96,
+        96
+      ],
+      "size": 9216,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.0.attn.proj.bias",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.0.norm2.weight",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.0.norm2.bias",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.0.mlp.0.weight",
+      "shape": [
+        384,
+        96
+      ],
+      "size": 36864,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.0.mlp.0.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.0.mlp.3.weight",
+      "shape": [
+        96,
+        384
+      ],
+      "size": 36864,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.0.mlp.3.bias",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.1.norm1.weight",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.1.norm1.bias",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.1.attn.relative_position_bias_table",
+      "shape": [
+        169,
+        3
+      ],
+      "size": 507,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.1.attn.qkv.weight",
+      "shape": [
+        288,
+        96
+      ],
+      "size": 27648,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.1.attn.qkv.bias",
+      "shape": [
+        288
+      ],
+      "size": 288,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.1.attn.proj.weight",
+      "shape": [
+        96,
+        96
+      ],
+      "size": 9216,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.1.attn.proj.bias",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.1.norm2.weight",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.1.norm2.bias",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.1.mlp.0.weight",
+      "shape": [
+        384,
+        96
+      ],
+      "size": 36864,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.1.mlp.0.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.1.mlp.3.weight",
+      "shape": [
+        96,
+        384
+      ],
+      "size": 36864,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.1.1.mlp.3.bias",
+      "shape": [
+        96
+      ],
+      "size": 96,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.2.reduction.weight",
+      "shape": [
+        192,
+        384
+      ],
+      "size": 73728,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.2.norm.weight",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.2.norm.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.0.norm1.weight",
+      "shape": [
+        192
+      ],
+      "size": 192,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.0.norm1.bias",
+      "shape": [
+        192
+      ],
+      "size": 192,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.0.attn.relative_position_bias_table",
+      "shape": [
+        169,
+        6
+      ],
+      "size": 1014,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.0.attn.qkv.weight",
+      "shape": [
+        576,
+        192
+      ],
+      "size": 110592,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.0.attn.qkv.bias",
+      "shape": [
+        576
+      ],
+      "size": 576,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.0.attn.proj.weight",
+      "shape": [
+        192,
+        192
+      ],
+      "size": 36864,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.0.attn.proj.bias",
+      "shape": [
+        192
+      ],
+      "size": 192,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.0.norm2.weight",
+      "shape": [
+        192
+      ],
+      "size": 192,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.0.norm2.bias",
+      "shape": [
+        192
+      ],
+      "size": 192,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.0.mlp.0.weight",
+      "shape": [
+        768,
+        192
+      ],
+      "size": 147456,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.0.mlp.0.bias",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.0.mlp.3.weight",
+      "shape": [
+        192,
+        768
+      ],
+      "size": 147456,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.0.mlp.3.bias",
+      "shape": [
+        192
+      ],
+      "size": 192,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.1.norm1.weight",
+      "shape": [
+        192
+      ],
+      "size": 192,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.1.norm1.bias",
+      "shape": [
+        192
+      ],
+      "size": 192,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.1.attn.relative_position_bias_table",
+      "shape": [
+        169,
+        6
+      ],
+      "size": 1014,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.1.attn.qkv.weight",
+      "shape": [
+        576,
+        192
+      ],
+      "size": 110592,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.1.attn.qkv.bias",
+      "shape": [
+        576
+      ],
+      "size": 576,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.1.attn.proj.weight",
+      "shape": [
+        192,
+        192
+      ],
+      "size": 36864,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.1.attn.proj.bias",
+      "shape": [
+        192
+      ],
+      "size": 192,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.1.norm2.weight",
+      "shape": [
+        192
+      ],
+      "size": 192,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.1.norm2.bias",
+      "shape": [
+        192
+      ],
+      "size": 192,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.1.mlp.0.weight",
+      "shape": [
+        768,
+        192
+      ],
+      "size": 147456,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.1.mlp.0.bias",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.1.mlp.3.weight",
+      "shape": [
+        192,
+        768
+      ],
+      "size": 147456,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.3.1.mlp.3.bias",
+      "shape": [
+        192
+      ],
+      "size": 192,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.4.reduction.weight",
+      "shape": [
+        384,
+        768
+      ],
+      "size": 294912,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.4.norm.weight",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.4.norm.bias",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.0.norm1.weight",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.0.norm1.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.0.attn.relative_position_bias_table",
+      "shape": [
+        169,
+        12
+      ],
+      "size": 2028,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.0.attn.qkv.weight",
+      "shape": [
+        1152,
+        384
+      ],
+      "size": 442368,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.0.attn.qkv.bias",
+      "shape": [
+        1152
+      ],
+      "size": 1152,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.0.attn.proj.weight",
+      "shape": [
+        384,
+        384
+      ],
+      "size": 147456,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.0.attn.proj.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.0.norm2.weight",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.0.norm2.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.0.mlp.0.weight",
+      "shape": [
+        1536,
+        384
+      ],
+      "size": 589824,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.0.mlp.0.bias",
+      "shape": [
+        1536
+      ],
+      "size": 1536,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.0.mlp.3.weight",
+      "shape": [
+        384,
+        1536
+      ],
+      "size": 589824,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.0.mlp.3.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.1.norm1.weight",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.1.norm1.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.1.attn.relative_position_bias_table",
+      "shape": [
+        169,
+        12
+      ],
+      "size": 2028,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.1.attn.qkv.weight",
+      "shape": [
+        1152,
+        384
+      ],
+      "size": 442368,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.1.attn.qkv.bias",
+      "shape": [
+        1152
+      ],
+      "size": 1152,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.1.attn.proj.weight",
+      "shape": [
+        384,
+        384
+      ],
+      "size": 147456,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.1.attn.proj.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.1.norm2.weight",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.1.norm2.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.1.mlp.0.weight",
+      "shape": [
+        1536,
+        384
+      ],
+      "size": 589824,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.1.mlp.0.bias",
+      "shape": [
+        1536
+      ],
+      "size": 1536,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.1.mlp.3.weight",
+      "shape": [
+        384,
+        1536
+      ],
+      "size": 589824,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.1.mlp.3.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.2.norm1.weight",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.2.norm1.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.2.attn.relative_position_bias_table",
+      "shape": [
+        169,
+        12
+      ],
+      "size": 2028,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.2.attn.qkv.weight",
+      "shape": [
+        1152,
+        384
+      ],
+      "size": 442368,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.2.attn.qkv.bias",
+      "shape": [
+        1152
+      ],
+      "size": 1152,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.2.attn.proj.weight",
+      "shape": [
+        384,
+        384
+      ],
+      "size": 147456,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.2.attn.proj.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.2.norm2.weight",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.2.norm2.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.2.mlp.0.weight",
+      "shape": [
+        1536,
+        384
+      ],
+      "size": 589824,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.2.mlp.0.bias",
+      "shape": [
+        1536
+      ],
+      "size": 1536,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.2.mlp.3.weight",
+      "shape": [
+        384,
+        1536
+      ],
+      "size": 589824,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.2.mlp.3.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.3.norm1.weight",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.3.norm1.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.3.attn.relative_position_bias_table",
+      "shape": [
+        169,
+        12
+      ],
+      "size": 2028,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.3.attn.qkv.weight",
+      "shape": [
+        1152,
+        384
+      ],
+      "size": 442368,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.3.attn.qkv.bias",
+      "shape": [
+        1152
+      ],
+      "size": 1152,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.3.attn.proj.weight",
+      "shape": [
+        384,
+        384
+      ],
+      "size": 147456,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.3.attn.proj.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.3.norm2.weight",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.3.norm2.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.3.mlp.0.weight",
+      "shape": [
+        1536,
+        384
+      ],
+      "size": 589824,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.3.mlp.0.bias",
+      "shape": [
+        1536
+      ],
+      "size": 1536,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.3.mlp.3.weight",
+      "shape": [
+        384,
+        1536
+      ],
+      "size": 589824,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.3.mlp.3.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.4.norm1.weight",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.4.norm1.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.4.attn.relative_position_bias_table",
+      "shape": [
+        169,
+        12
+      ],
+      "size": 2028,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.4.attn.qkv.weight",
+      "shape": [
+        1152,
+        384
+      ],
+      "size": 442368,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.4.attn.qkv.bias",
+      "shape": [
+        1152
+      ],
+      "size": 1152,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.4.attn.proj.weight",
+      "shape": [
+        384,
+        384
+      ],
+      "size": 147456,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.4.attn.proj.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.4.norm2.weight",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.4.norm2.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.4.mlp.0.weight",
+      "shape": [
+        1536,
+        384
+      ],
+      "size": 589824,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.4.mlp.0.bias",
+      "shape": [
+        1536
+      ],
+      "size": 1536,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.4.mlp.3.weight",
+      "shape": [
+        384,
+        1536
+      ],
+      "size": 589824,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.4.mlp.3.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.5.norm1.weight",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.5.norm1.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.5.attn.relative_position_bias_table",
+      "shape": [
+        169,
+        12
+      ],
+      "size": 2028,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.5.attn.qkv.weight",
+      "shape": [
+        1152,
+        384
+      ],
+      "size": 442368,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.5.attn.qkv.bias",
+      "shape": [
+        1152
+      ],
+      "size": 1152,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.5.attn.proj.weight",
+      "shape": [
+        384,
+        384
+      ],
+      "size": 147456,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.5.attn.proj.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.5.norm2.weight",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.5.norm2.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.5.mlp.0.weight",
+      "shape": [
+        1536,
+        384
+      ],
+      "size": 589824,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.5.mlp.0.bias",
+      "shape": [
+        1536
+      ],
+      "size": 1536,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.5.mlp.3.weight",
+      "shape": [
+        384,
+        1536
+      ],
+      "size": 589824,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.5.5.mlp.3.bias",
+      "shape": [
+        384
+      ],
+      "size": 384,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.6.reduction.weight",
+      "shape": [
+        768,
+        1536
+      ],
+      "size": 1179648,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.6.norm.weight",
+      "shape": [
+        1536
+      ],
+      "size": 1536,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.6.norm.bias",
+      "shape": [
+        1536
+      ],
+      "size": 1536,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.0.norm1.weight",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.0.norm1.bias",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.0.attn.relative_position_bias_table",
+      "shape": [
+        169,
+        24
+      ],
+      "size": 4056,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.0.attn.qkv.weight",
+      "shape": [
+        2304,
+        768
+      ],
+      "size": 1769472,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.0.attn.qkv.bias",
+      "shape": [
+        2304
+      ],
+      "size": 2304,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.0.attn.proj.weight",
+      "shape": [
+        768,
+        768
+      ],
+      "size": 589824,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.0.attn.proj.bias",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.0.norm2.weight",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.0.norm2.bias",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.0.mlp.0.weight",
+      "shape": [
+        3072,
+        768
+      ],
+      "size": 2359296,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.0.mlp.0.bias",
+      "shape": [
+        3072
+      ],
+      "size": 3072,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.0.mlp.3.weight",
+      "shape": [
+        768,
+        3072
+      ],
+      "size": 2359296,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.0.mlp.3.bias",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.1.norm1.weight",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.1.norm1.bias",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.1.attn.relative_position_bias_table",
+      "shape": [
+        169,
+        24
+      ],
+      "size": 4056,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.1.attn.qkv.weight",
+      "shape": [
+        2304,
+        768
+      ],
+      "size": 1769472,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.1.attn.qkv.bias",
+      "shape": [
+        2304
+      ],
+      "size": 2304,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.1.attn.proj.weight",
+      "shape": [
+        768,
+        768
+      ],
+      "size": 589824,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.1.attn.proj.bias",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.1.norm2.weight",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.1.norm2.bias",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.1.mlp.0.weight",
+      "shape": [
+        3072,
+        768
+      ],
+      "size": 2359296,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.1.mlp.0.bias",
+      "shape": [
+        3072
+      ],
+      "size": 3072,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.1.mlp.3.weight",
+      "shape": [
+        768,
+        3072
+      ],
+      "size": 2359296,
+      "trainable": true
+    },
+    {
+      "name": "backbone.features.7.1.mlp.3.bias",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.norm.weight",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "backbone.norm.bias",
+      "shape": [
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "head.1.weight",
+      "shape": [
+        1,
+        768
+      ],
+      "size": 768,
+      "trainable": true
+    },
+    {
+      "name": "head.1.bias",
+      "shape": [
+        1
+      ],
+      "size": 1,
+      "trainable": true
+    },
+    {
+      "name": "skip_connection.0.weight",
+      "shape": [
+        128,
+        768
+      ],
+      "size": 98304,
+      "trainable": true
+    },
+    {
+      "name": "skip_connection.0.bias",
+      "shape": [
+        128
+      ],
+      "size": 128,
+      "trainable": true
+    },
+    {
+      "name": "skip_connection.2.weight",
+      "shape": [
+        1,
+        128
+      ],
+      "size": 128,
+      "trainable": true
+    },
+    {
+      "name": "skip_connection.2.bias",
+      "shape": [
+        1
+      ],
+      "size": 1,
+      "trainable": true
+    }
+  ],
+  "key_layers": {
+    "first_layer": "backbone",
+    "last_layer": "skip_connection.2"
+  },
+  "key_parameters": {
+    "largest_param_0": "backbone.features.7.0.mlp.0.weight",
+    "largest_param_1": "backbone.features.7.0.mlp.3.weight",
+    "largest_param_2": "backbone.features.7.1.mlp.0.weight"
+  }
+}

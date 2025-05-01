@@ -1,0 +1,367 @@
+{
+  "model_type": "CNNModel",
+  "model_class": "CNNModel",
+  "total_parameters": 25817857,
+  "trainable_parameters": 25817857,
+  "layers": [
+    {
+      "name": "conv_layers",
+      "type": "ModuleList",
+      "parameters": 93696,
+      "trainable_parameters": 93696
+    },
+    {
+      "name": "conv_layers.0",
+      "type": "Sequential",
+      "parameters": 960,
+      "trainable_parameters": 960
+    },
+    {
+      "name": "conv_layers.0.0",
+      "type": "Conv2d",
+      "parameters": 896,
+      "trainable_parameters": 896
+    },
+    {
+      "name": "conv_layers.0.1",
+      "type": "BatchNorm2d",
+      "parameters": 64,
+      "trainable_parameters": 64
+    },
+    {
+      "name": "conv_layers.0.2",
+      "type": "ReLU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "conv_layers.0.3",
+      "type": "MaxPool2d",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "conv_layers.1",
+      "type": "Sequential",
+      "parameters": 18624,
+      "trainable_parameters": 18624
+    },
+    {
+      "name": "conv_layers.1.0",
+      "type": "Conv2d",
+      "parameters": 18496,
+      "trainable_parameters": 18496
+    },
+    {
+      "name": "conv_layers.1.1",
+      "type": "BatchNorm2d",
+      "parameters": 128,
+      "trainable_parameters": 128
+    },
+    {
+      "name": "conv_layers.1.2",
+      "type": "ReLU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "conv_layers.1.3",
+      "type": "MaxPool2d",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "conv_layers.2",
+      "type": "Sequential",
+      "parameters": 74112,
+      "trainable_parameters": 74112
+    },
+    {
+      "name": "conv_layers.2.0",
+      "type": "Conv2d",
+      "parameters": 73856,
+      "trainable_parameters": 73856
+    },
+    {
+      "name": "conv_layers.2.1",
+      "type": "BatchNorm2d",
+      "parameters": 256,
+      "trainable_parameters": 256
+    },
+    {
+      "name": "conv_layers.2.2",
+      "type": "ReLU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "conv_layers.2.3",
+      "type": "MaxPool2d",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "fc_layers",
+      "type": "Sequential",
+      "parameters": 25724032,
+      "trainable_parameters": 25724032
+    },
+    {
+      "name": "fc_layers.0",
+      "type": "Linear",
+      "parameters": 25690368,
+      "trainable_parameters": 25690368
+    },
+    {
+      "name": "fc_layers.1",
+      "type": "BatchNorm1d",
+      "parameters": 512,
+      "trainable_parameters": 512
+    },
+    {
+      "name": "fc_layers.2",
+      "type": "ReLU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "fc_layers.3",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "fc_layers.4",
+      "type": "Linear",
+      "parameters": 32896,
+      "trainable_parameters": 32896
+    },
+    {
+      "name": "fc_layers.5",
+      "type": "BatchNorm1d",
+      "parameters": 256,
+      "trainable_parameters": 256
+    },
+    {
+      "name": "fc_layers.6",
+      "type": "ReLU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "fc_layers.7",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "head",
+      "type": "Linear",
+      "parameters": 129,
+      "trainable_parameters": 129
+    }
+  ],
+  "parameters": [
+    {
+      "name": "conv_layers.0.0.weight",
+      "shape": [
+        32,
+        3,
+        3,
+        3
+      ],
+      "size": 864,
+      "trainable": true
+    },
+    {
+      "name": "conv_layers.0.0.bias",
+      "shape": [
+        32
+      ],
+      "size": 32,
+      "trainable": true
+    },
+    {
+      "name": "conv_layers.0.1.weight",
+      "shape": [
+        32
+      ],
+      "size": 32,
+      "trainable": true
+    },
+    {
+      "name": "conv_layers.0.1.bias",
+      "shape": [
+        32
+      ],
+      "size": 32,
+      "trainable": true
+    },
+    {
+      "name": "conv_layers.1.0.weight",
+      "shape": [
+        64,
+        32,
+        3,
+        3
+      ],
+      "size": 18432,
+      "trainable": true
+    },
+    {
+      "name": "conv_layers.1.0.bias",
+      "shape": [
+        64
+      ],
+      "size": 64,
+      "trainable": true
+    },
+    {
+      "name": "conv_layers.1.1.weight",
+      "shape": [
+        64
+      ],
+      "size": 64,
+      "trainable": true
+    },
+    {
+      "name": "conv_layers.1.1.bias",
+      "shape": [
+        64
+      ],
+      "size": 64,
+      "trainable": true
+    },
+    {
+      "name": "conv_layers.2.0.weight",
+      "shape": [
+        128,
+        64,
+        3,
+        3
+      ],
+      "size": 73728,
+      "trainable": true
+    },
+    {
+      "name": "conv_layers.2.0.bias",
+      "shape": [
+        128
+      ],
+      "size": 128,
+      "trainable": true
+    },
+    {
+      "name": "conv_layers.2.1.weight",
+      "shape": [
+        128
+      ],
+      "size": 128,
+      "trainable": true
+    },
+    {
+      "name": "conv_layers.2.1.bias",
+      "shape": [
+        128
+      ],
+      "size": 128,
+      "trainable": true
+    },
+    {
+      "name": "fc_layers.0.weight",
+      "shape": [
+        256,
+        100352
+      ],
+      "size": 25690112,
+      "trainable": true
+    },
+    {
+      "name": "fc_layers.0.bias",
+      "shape": [
+        256
+      ],
+      "size": 256,
+      "trainable": true
+    },
+    {
+      "name": "fc_layers.1.weight",
+      "shape": [
+        256
+      ],
+      "size": 256,
+      "trainable": true
+    },
+    {
+      "name": "fc_layers.1.bias",
+      "shape": [
+        256
+      ],
+      "size": 256,
+      "trainable": true
+    },
+    {
+      "name": "fc_layers.4.weight",
+      "shape": [
+        128,
+        256
+      ],
+      "size": 32768,
+      "trainable": true
+    },
+    {
+      "name": "fc_layers.4.bias",
+      "shape": [
+        128
+      ],
+      "size": 128,
+      "trainable": true
+    },
+    {
+      "name": "fc_layers.5.weight",
+      "shape": [
+        128
+      ],
+      "size": 128,
+      "trainable": true
+    },
+    {
+      "name": "fc_layers.5.bias",
+      "shape": [
+        128
+      ],
+      "size": 128,
+      "trainable": true
+    },
+    {
+      "name": "head.weight",
+      "shape": [
+        1,
+        128
+      ],
+      "size": 128,
+      "trainable": true
+    },
+    {
+      "name": "head.bias",
+      "shape": [
+        1
+      ],
+      "size": 1,
+      "trainable": true
+    }
+  ],
+  "key_layers": {
+    "conv_0": "conv_layers.0.0",
+    "conv_1": "conv_layers.1.0",
+    "conv_2": "conv_layers.2.0",
+    "fc_0": "fc_layers.0",
+    "fc_1": "fc_layers.4",
+    "fc_2": "head"
+  },
+  "key_parameters": {
+    "largest_param_0": "fc_layers.0.weight",
+    "largest_param_1": "conv_layers.2.0.weight",
+    "largest_param_2": "fc_layers.4.weight"
+  }
+}

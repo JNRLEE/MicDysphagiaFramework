@@ -1,0 +1,155 @@
+#python scripts/run_experiments.py --config config/audio_swin_classification.yaml
+# cd /Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My\ Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework && python scripts/run_experiments.py --config config/audio_swin_classification.yaml
+global:
+  experiment_name: 'audio_swin_classification'
+  seed: 42
+  debug: false
+  device: 'auto'
+  output_dir: 'results'
+
+data:
+  type: 'audio'
+  source:
+    wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
+  preprocessing:
+    audio:
+      sr: 16000
+      duration: 5
+      normalize: true
+    spectrogram:
+      method: 'mel'
+      n_mels: 128
+      n_fft: 1024
+      hop_length: 512
+      power: 2.0
+      normalized: true
+  filtering:
+    score_thresholds:
+      normal: 0  # score <= 0 為正常人
+      patient: 9  # score >= 9 為病人
+    class_config:
+      NoMovement: 1
+      DrySwallow: 1
+      Cracker: 1
+      Jelly: 1
+      WaterDrinking: 1
+    subject_source:
+      normal:
+        include_N: 1  # 包含 N 開頭的正常人
+        include_P: 1  # 包含 P 開頭的正常人
+      patient:
+        include_N: 0  # 不包含 N 開頭的病人
+        include_P: 1  # 包含 P 開頭的病人
+    task_type: 'classification'  # 分類任務
+
+  splits:
+    train_ratio: 0.7
+    val_ratio: 0.15
+    test_ratio: 0.15
+    split_by_patient: true
+    split_seed: 42
+  dataloader:
+    batch_size: 16
+    num_workers: 2
+    pin_memory: true
+    drop_last: false
+
+model:
+  type: 'swin_transformer'
+  parameters:
+    model_name: 'swin_tiny_patch4_window7_224'
+    pretrained: true
+    num_classes: 10  # 10個分類（5種動作 x 2種患者類型）
+    input_channels: 3
+    input_size: [224, 224]
+    dropout_rate: 0.2
+    is_classification: true  # 分類任務
+  backbone:
+    freeze: false
+    unfreeze_layers: 2
+  visual_prompting:
+    enabled: false
+
+training:
+  epochs: 6
+  save_every: 3
+  early_stopping:
+    enabled: true
+    patience: 10
+    min_delta: 0.001
+
+  # 損失函數設置 (選擇其中一種配置方式)
+  
+  # 1. 標準損失函數配置
+  # loss:
+  #   type: 'MSELoss'  # （適用於回歸任務）
+  #   parameters:
+  #     reduction: 'mean'
+  
+  loss:
+    type: 'CrossEntropyLoss'  # （適用於分類任務）
+    parameters:
+      reduction: 'mean'
+  
+  # 2. 排序損失函數配置
+  
+  # 2.1 成對排序損失 (Pairwise)
+  # loss:
+  #   type: 'PairwiseRankingLoss'（適用於分類任務）
+  #   parameters:
+  #     margin: 0.3
+  #     sampling_ratio: 0.25
+  #     sampling_strategy: 'score_diff'  # 可選: 'random', 'score_diff', 'hard_negative'
+  #     use_exp: false
+  
+  # 2.2 列表排序損失 (Listwise)
+  # loss:
+  #   type: 'ListwiseRankingLoss'（適用於分類任務）
+  #   parameters:
+  #     method: 'listnet'  # 可選: 'listnet', 'listmle', 'approxndcg'
+  #     temperature: 1.0
+  #     k: 10
+  #     group_size: 8  # 如果>0，將batch分成group_size的子批次
+  #     stochastic: true
+  
+  # 2.3 LambdaRank損失
+  # loss:
+  #   type: 'LambdaRankLoss'  # （適用於分類任務）
+  #   parameters:
+  #     sigma: 1.0
+  #     k: 10
+  #     sampling_ratio: 0.3
+  
+  # 3. 加權損失函數
+  # loss:
+  #   type: 'WeightedMSELoss'（適用於回歸任務）
+  #   parameters:
+  #     reduction: 'mean'
+  
+  # 4. 焦點損失
+  # loss:
+  #   type: 'FocalLoss'（適用於分類任務）
+  #   parameters:
+  #     alpha: 0.25
+  #     gamma: 2.0
+  #     reduction: 'mean'
+
+
+  optimizer:
+    type: 'Adam'
+    parameters:
+      lr: 0.001
+      weight_decay: 0.0001
+  scheduler:
+    type: 'ReduceLROnPlateau'
+    parameters:
+      mode: 'min'
+      factor: 0.5
+      patience: 5
+
+evaluation:
+  metrics: ['accuracy', 'f1_score', 'precision', 'recall']
+  log_predictions: true
+  confusion_matrix: true 
+
+

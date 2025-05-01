@@ -1,0 +1,61 @@
+Collecting timm
+  Using cached timm-1.0.15-py3-none-any.whl.metadata (52 kB)
+Requirement already satisfied: torch in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from timm) (2.5.1)
+Requirement already satisfied: torchvision in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from timm) (0.20.1)
+Requirement already satisfied: pyyaml in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from timm) (6.0.2)
+Collecting huggingface_hub (from timm)
+  Using cached huggingface_hub-0.30.2-py3-none-any.whl.metadata (13 kB)
+Collecting safetensors (from timm)
+  Using cached safetensors-0.5.3-cp38-abi3-win_amd64.whl.metadata (3.9 kB)
+Requirement already satisfied: filelock in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from huggingface_hub->timm) (3.17.0)
+Collecting fsspec>=2023.5.0 (from huggingface_hub->timm)
+  Using cached fsspec-2025.3.2-py3-none-any.whl.metadata (11 kB)
+Collecting packaging>=20.9 (from huggingface_hub->timm)
+  Using cached packaging-25.0-py3-none-any.whl.metadata (3.3 kB)
+Requirement already satisfied: requests in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from huggingface_hub->timm) (2.32.3)
+Collecting tqdm>=4.42.1 (from huggingface_hub->timm)
+  Using cached tqdm-4.67.1-py3-none-any.whl.metadata (57 kB)
+Requirement already satisfied: typing-extensions>=3.7.4.3 in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from huggingface_hub->timm) (4.12.2)
+Collecting colorama (from tqdm>=4.42.1->huggingface_hub->timm)
+  Using cached colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+Requirement already satisfied: charset-normalizer<4,>=2 in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from requests->huggingface_hub->timm) (3.3.2)
+Requirement already satisfied: idna<4,>=2.5 in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from requests->huggingface_hub->timm) (3.7)
+Requirement already satisfied: urllib3<3,>=1.21.1 in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from requests->huggingface_hub->timm) (2.3.0)
+Requirement already satisfied: certifi>=2017.4.17 in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from requests->huggingface_hub->timm) (2025.4.26)
+Requirement already satisfied: networkx in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from torch->timm) (3.2.1)
+Requirement already satisfied: jinja2 in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from torch->timm) (3.1.6)
+Collecting sympy==1.13.1 (from torch->timm)
+  Using cached sympy-1.13.1-py3-none-any.whl.metadata (12 kB)
+Requirement already satisfied: mpmath<1.4,>=1.1.0 in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from sympy==1.13.1->torch->timm) (1.3.0)
+Requirement already satisfied: MarkupSafe>=2.0 in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from jinja2->torch->timm) (3.0.2)
+Requirement already satisfied: numpy in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from torchvision->timm) (2.0.1)
+Requirement already satisfied: pillow!=8.3.*,>=5.3.0 in c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages (from torchvision->timm) (11.1.0)
+Using cached timm-1.0.15-py3-none-any.whl (2.4 MB)
+Using cached huggingface_hub-0.30.2-py3-none-any.whl (481 kB)
+Using cached fsspec-2025.3.2-py3-none-any.whl (194 kB)
+Using cached packaging-25.0-py3-none-any.whl (66 kB)
+Using cached tqdm-4.67.1-py3-none-any.whl (78 kB)
+Using cached colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+Using cached safetensors-0.5.3-cp38-abi3-win_amd64.whl (308 kB)
+Using cached sympy-1.13.1-py3-none-any.whl (6.2 MB)
+Installing collected packages: sympy, safetensors, packaging, fsspec, colorama, tqdm, huggingface_hub, timm
+  Attempting uninstall: sympy
+    Found existing installation: sympy 1.13.3
+    Uninstalling sympy-1.13.3:
+      Successfully uninstalled sympy-1.13.3
+  Rolling back uninstall of sympy
+  Moving to c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages\__pycache__\isympy.cpython-39.pyc
+   from C:\Users\Jerry Han\AppData\Local\Temp\pip-uninstall-nxg6zluf\isympy.cpython-39.pyc
+  Moving to c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages\isympy.py
+   from C:\Users\Jerry Han\AppData\Local\Temp\pip-uninstall-qixwya23\isympy.py
+  Moving to c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages\sympy-1.13.3.dist-info\
+   from C:\Users\Jerry Han\miniconda3\envs\micdys\Lib\site-packages\~ympy-1.13.3.dist-info
+  Moving to c:\users\jerry han\miniconda3\envs\micdys\lib\site-packages\sympy\
+   from C:\Users\Jerry Han\miniconda3\envs\micdys\Lib\site-packages\~ympy
+  Moving to c:\users\jerry han\miniconda3\envs\micdys\scripts\isympy-script.py
+   from C:\Users\Jerry Han\AppData\Local\Temp\pip-uninstall-8iyeg_r1\isympy-script.py
+  Moving to c:\users\jerry han\miniconda3\envs\micdys\scripts\isympy.exe
+   from C:\Users\Jerry Han\AppData\Local\Temp\pip-uninstall-8iyeg_r1\isympy.exe
+  Moving to c:\users\jerry han\miniconda3\envs\micdys\share\man\man1\
+   from C:\Users\Jerry Han\miniconda3\envs\micdys\share\man\~an1
+

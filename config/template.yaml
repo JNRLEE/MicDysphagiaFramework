@@ -1,0 +1,278 @@
+# 這是一個大模板yaml，包含data type, model, loss的各種配置選項
+
+global:
+  experiment_name: 'template_experiment'  # 實驗名稱，用於記錄和區分不同的實驗
+  seed: 42                                # 隨機種子，確保結果可重現
+  debug: false                            # 是否啟用調試模式
+  device: 'auto'                          # 執行設備，'auto'自動選擇，或指定'cuda:0', 'cpu'
+  output_dir: 'results'                   # 結果輸出目錄
+
+data:
+  # 選擇數據類型：音頻、頻譜圖或特徵
+  # type: 'audio'
+  # type: 'spectrogram'
+  # type: 'feature'
+  
+  source:
+    # 音頻數據源
+    # wav_dir: 'path/to/audio/files'
+    
+    # 頻譜圖數據源
+    # spectrogram_dir: 'path/to/spectrogram/files'
+    
+    # 特徵數據源
+    # feature_dir: 'path/to/feature/files'
+  
+  preprocessing:
+    audio:
+      sr: 16000
+      duration: 5
+      normalize: true
+    spectrogram:
+      method: 'mel'
+      n_mels: 128
+      n_fft: 1024
+      hop_length: 512
+      power: 2.0
+      normalized: true
+    # feature: # 特徵預處理配置
+    #   normalize: true
+
+  filtering:
+    # task_type: 'regression'  # 回歸任務
+    # task_type: 'classification'  # 分類任務
+    class_config:
+      NoMovement: 1
+      DrySwallow: 1
+      Cracker: 1
+      Jelly: 1
+      WaterDrinking: 1
+
+  splits:
+    train_ratio: 0.7
+    val_ratio: 0.15
+    test_ratio: 0.15
+    split_by_patient: true
+    split_seed: 42
+
+  dataloader:
+    batch_size: 16
+    num_workers: 2
+    pin_memory: true
+    drop_last: false
+
+model:
+  # 選擇模型類型
+  # type: 'swin_transformer'
+  # type: 'resnet'
+  # type: 'cnn'
+  # type: 'fcnn'
+  
+  parameters:
+    # Swin Transformer 參數
+    # model_name: 'swin_tiny_patch4_window7_224'
+    # pretrained: true
+    # num_classes: 1  # 回歸任務
+    # num_classes: 10  # 分類任務
+    # input_channels: 3
+    # input_size: [224, 224]
+    # dropout_rate: 0.2
+    # is_classification: false  # 回歸任務
+    # is_classification: true  # 分類任務
+
+  backbone:
+    freeze: false
+    unfreeze_layers: 2
+
+  visual_prompting:
+    enabled: false
+
+training:
+  epochs: 50
+  save_every: 10
+  early_stopping:
+    enabled: true
+    patience: 10
+    min_delta: 0.001
+
+  # 損失函數設置 (選擇其中一種配置方式)
+  
+  # 1. 標準損失函數配置
+  # loss:
+  #   type: 'MSELoss'  # （適用於回歸任務）
+  #   parameters:
+  #     reduction: 'mean'
+  
+  # loss:
+  #   type: 'CrossEntropyLoss'  # （適用於分類任務）
+  #   parameters:
+  #     reduction: 'mean'
+  
+  # 2. 排序損失函數配置
+  
+  # 2.1 成對排序損失 (Pairwise)
+  # loss:
+  #   type: 'PairwiseRankingLoss'（適用於分類任務）
+  #   parameters:
+  #     margin: 0.3
+  #     sampling_ratio: 0.25
+  #     sampling_strategy: 'score_diff'  # 可選: 'random', 'score_diff', 'hard_negative'
+  #     use_exp: false
+  
+  # 2.2 列表排序損失 (Listwise)
+  # loss:
+  #   type: 'ListwiseRankingLoss'（適用於分類任務）
+  #   parameters:
+  #     method: 'listnet'  # 可選: 'listnet', 'listmle', 'approxndcg'
+  #     temperature: 1.0
+  #     k: 10
+  #     group_size: 8  # 如果>0，將batch分成group_size的子批次
+  #     stochastic: true
+  
+  # 2.3 LambdaRank損失
+  # loss:
+  #   type: 'LambdaRankLoss'（適用於分類任務）
+  #   parameters:
+  #     sigma: 1.0
+  #     k: 10
+  #     sampling_ratio: 0.3
+  
+  # 3. 加權損失函數
+  # loss:
+  #   type: 'WeightedMSELoss'（適用於回歸任務）
+  #   parameters:
+  #     reduction: 'mean'
+  
+  # 4. 焦點損失
+  # loss:
+  #   type: 'FocalLoss'（適用於分類任務）
+  #   parameters:
+  #     alpha: 0.25
+  #     gamma: 2.0
+  #     reduction: 'mean'
+  
+  # 5. 組合損失函數配置
+  
+  # 5.1 靜態權重組合
+  # loss:
+  #   combined:
+  #     mse:
+  #       type: 'MSELoss'
+  #       weight: 0.6
+  #       parameters:
+  #         reduction: 'mean'
+  #     ranking:
+  #       type: 'PairwiseRankingLoss'
+  #       weight: 0.4
+  #       parameters:
+  #         margin: 0.3
+  #         sampling_strategy: 'score_diff'
+  
+  # 5.2 動態權重組合
+  # loss:
+  #   combined:
+  #     mse:
+  #       type: 'MSELoss'
+  #       weight:
+  #         start: 0.8
+  #         end: 0.3
+  #         schedule: 'linear'  # 線性減少MSE的權重
+  #       parameters:
+  #         reduction: 'mean'
+  #     lambdarank:
+  #       type: 'LambdaRankLoss'
+  #       weight:
+  #         start: 0.2
+  #         end: 0.7
+  #         schedule: 'linear'  # 線性增加LambdaRank的權重
+  #       parameters:
+  #         sigma: 1.0
+  #         k: 10
+  
+  # 5.3 自適應權重組合
+  # loss:
+  #   type: 'CombinedLoss'
+  #   parameters:
+  #     losses:
+  #       mse:
+  #         type: 'MSELoss'
+  #         parameters:
+  #           reduction: 'mean'
+  #       listwise:
+  #         type: 'ListwiseRankingLoss'
+  #         parameters:
+  #           method: 'listmle'
+  #           temperature: 1.0
+  #     weights:
+  #       mse: 0.5
+  #       listwise: 0.5
+  #     adaptive_weights: true
+  #     weight_update_freq: 100
+  #     weight_update_ratio: 0.1
+
+  optimizer:
+    type: 'Adam'
+    parameters:
+      lr: 0.001
+      weight_decay: 0.0001
+
+  scheduler:
+    type: 'ReduceLROnPlateau'
+    parameters:
+      mode: 'min'
+      factor: 0.5
+      patience: 5
+
+evaluation:
+  # 選擇評估指標
+  # metrics: ['mse', 'mae', 'r2']  # 回歸評估指標
+  # metrics: ['accuracy', 'f1_score', 'precision', 'recall']  # 分類評估指標
+  log_predictions: true
+  confusion_matrix: true  # 僅分類任務使用
+
+# 數據分析配置：整合SBP_analyzer功能進行模型與數據分析
+analysis:
+  enabled: true                           # 是否啟用分析功能
+  
+  # 模型分析配置：監控模型內部狀態
+  model_analytics:
+    enabled: true                         # 是否啟用模型分析
+    output_dir: 'analysis_results'        # 分析結果保存目錄
+    save_frequency: 1                     # 分析結果保存頻率(每多少epoch)
+    monitored_layers:                     # 要監控的層名稱，如果為null則監控所有層
+      - 'encoder.layer1'                  # 可以通過查看模型結構獲取層名稱
+      - 'encoder.layer2'
+      - 'decoder'
+    monitored_params:                     # 要監控的參數，如果為null則監控所有參數
+      - 'encoder.layer1.weight'
+      - 'decoder.weight'
+  
+  # 數據監控配置：監控數據分佈情況
+  data_monitor:
+    enabled: true                         # 是否啟用數據監控
+    batch_frequency: 10                   # 每多少批次進行一次監控
+    visualization: true                   # 是否生成可視化
+    metrics:                              # 要計算的統計指標
+      - 'mean'
+      - 'std'
+      - 'min'
+      - 'max'
+      - 'skew'
+  
+  # 特徵監控配置：分析中間特徵提取情況
+  feature_monitor:
+    enabled: true                         # 是否啟用特徵監控
+    epoch_frequency: 1                    # 每多少epoch監控一次
+    visualization: true                   # 是否生成可視化
+    methods:                              # 使用的特徵分析方法
+      - 'pca'                             # 主成分分析
+      - 't-sne'                           # t-SNE降維可視化
+      - 'feature_importance'              # 特徵重要性分析
+  
+  # 異常檢測配置：檢測數據與預測中的異常
+  outlier_detection:
+    enabled: false                        # 是否啟用異常檢測
+    methods:                              # 使用的異常檢測方法
+      - 'isolation_forest'                # 隔離森林
+      - 'local_outlier_factor'            # 局部異常因子
+    threshold: 0.95                       # 異常閾值

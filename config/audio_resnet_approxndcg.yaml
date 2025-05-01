@@ -1,0 +1,88 @@
+#python scripts/run_experiments.py --config config/audio_resnet_approxndcg.yaml
+
+global:
+  experiment_name: 'audio_resnet_approxndcg'
+  seed: 42
+  debug: false
+  device: 'auto'
+  output_dir: 'results'
+
+data:
+  type: 'audio'
+  source:
+    wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
+  preprocessing:
+    audio:
+      sr: 16000
+      duration: 5
+      normalize: true
+    spectrogram:
+      method: 'mel'
+      n_mels: 128
+      n_fft: 1024
+      hop_length: 512
+      power: 2.0
+      normalized: true
+  splits:
+    train_ratio: 0.7
+    val_ratio: 0.15
+    test_ratio: 0.15
+    split_by_patient: true
+    split_seed: 42
+  dataloader:
+    batch_size: 16
+    num_workers: 2
+    pin_memory: true
+    drop_last: false
+
+model:
+  type: 'resnet'
+  parameters:
+    model_name: 'resnet18'
+    pretrained: true
+    num_classes: 1
+    input_channels: 3
+    dropout_rate: 0.2
+    is_classification: false
+  backbone:
+    freeze: true
+    unfreeze_layers: 1
+
+training:
+  epochs: 6
+  save_every: 3
+  early_stopping:
+    enabled: true
+    patience: 10
+    min_delta: 0.001
+  loss:
+    type: 'ApproxNDCGLoss'
+    parameters:
+      temperature: 0.1
+      k: 5
+  # 1. 標準損失函數配置
+  # loss:
+  #   type: 'MSELoss'  # （適用於回歸任務）
+  #   parameters:
+  #     reduction: 'mean'
+  
+  # loss:
+  #   type: 'CrossEntropyLoss'  # （適用於分類任務）
+  #   parameters:
+  #     reduction: 'mean'
+  optimizer:
+    type: 'AdamW'
+    parameters:
+      lr: 0.0003
+      weight_decay: 0.01
+  scheduler:
+    type: 'OneCycleLR'
+    parameters:
+      max_lr: 0.001
+      total_steps: 1000
+
+evaluation:
+  metrics: ['mse', 'mae', 'ndcg', 'spearman_corr']
+  ndcg_k: 5
+  log_predictions: true
+  ranking_visualization: true 

@@ -1,0 +1,561 @@
+{
+    "model_name": "Unknown",
+    "model_type": null,
+    "architecture_type": "unknown",
+    "total_params": 51729281,
+    "trainable_params": 51729281,
+    "non_trainable_params": 0,
+    "layer_count": 26,
+    "layer_types": {
+        "ModuleList": 1,
+        "Sequential": 4,
+        "Conv2d": 3,
+        "BatchNorm2d": 3,
+        "ReLU": 5,
+        "MaxPool2d": 3,
+        "Linear": 3,
+        "BatchNorm1d": 2,
+        "Dropout": 2
+    },
+    "parameter_distribution": {
+        "by_type": {
+            "ModuleList": 93696,
+            "Sequential": 25817728,
+            "Conv2d": 93248,
+            "BatchNorm2d": 448,
+            "ReLU": 0,
+            "MaxPool2d": 0,
+            "Linear": 25723393,
+            "BatchNorm1d": 768,
+            "Dropout": 0
+        },
+        "by_type_pct": {
+            "ModuleList": 0.18112759000071932,
+            "Sequential": 49.90931151739766,
+            "Conv2d": 0.18026154278077053,
+            "BatchNorm2d": 0.0008660472199487946,
+            "ReLU": 0.0,
+            "MaxPool2d": 0.0,
+            "Linear": 49.72694865022385,
+            "BatchNorm1d": 0.0014846523770550763,
+            "Dropout": 0.0
+        },
+        "by_layer": {
+            "conv_layers": 93696,
+            "conv_layers.0": 960,
+            "conv_layers.0.0": 896,
+            "conv_layers.0.1": 64,
+            "conv_layers.0.2": 0,
+            "conv_layers.0.3": 0,
+            "conv_layers.1": 18624,
+            "conv_layers.1.0": 18496,
+            "conv_layers.1.1": 128,
+            "conv_layers.1.2": 0,
+            "conv_layers.1.3": 0,
+            "conv_layers.2": 74112,
+            "conv_layers.2.0": 73856,
+            "conv_layers.2.1": 256,
+            "conv_layers.2.2": 0,
+            "conv_layers.2.3": 0,
+            "fc_layers": 25724032,
+            "fc_layers.0": 25690368,
+            "fc_layers.1": 512,
+            "fc_layers.2": 0,
+            "fc_layers.3": 0,
+            "fc_layers.4": 32896,
+            "fc_layers.5": 256,
+            "fc_layers.6": 0,
+            "fc_layers.7": 0,
+            "head": 129
+        },
+        "concentration": {
+            "gini_coefficient": 0.9216378385535502
+        },
+        "percentiles": {
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 192.5,
+            "p75": 18592.0,
+            "p90": 83904.0
+        }
+    },
+    "model_depth": 0,
+    "sparse_layers": [],
+    "largest_layers": [
+        {
+            "layer_id": "fc_layers",
+            "type": "Sequential",
+            "parameters": 25724032
+        },
+        {
+            "layer_id": "fc_layers.0",
+            "type": "Linear",
+            "parameters": 25690368
+        },
+        {
+            "layer_id": "conv_layers",
+            "type": "ModuleList",
+            "parameters": 93696
+        },
+        {
+            "layer_id": "conv_layers.2",
+            "type": "Sequential",
+            "parameters": 74112
+        },
+        {
+            "layer_id": "conv_layers.2.0",
+            "type": "Conv2d",
+            "parameters": 73856
+        }
+    ],
+    "layer_complexity": {
+        "conv_layers": {
+            "parameter_complexity": 93696,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 374784,
+            "complexity_score": null
+        },
+        "conv_layers.0": {
+            "parameter_complexity": 960,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 3840,
+            "complexity_score": null
+        },
+        "conv_layers.0.0": {
+            "parameter_complexity": 896,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 3584,
+            "complexity_score": null
+        },
+        "conv_layers.0.1": {
+            "parameter_complexity": 64,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 256,
+            "complexity_score": null
+        },
+        "conv_layers.0.2": {
+            "parameter_complexity": 0,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 0,
+            "complexity_score": null
+        },
+        "conv_layers.0.3": {
+            "parameter_complexity": 0,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 0,
+            "complexity_score": null
+        },
+        "conv_layers.1": {
+            "parameter_complexity": 18624,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 74496,
+            "complexity_score": null
+        },
+        "conv_layers.1.0": {
+            "parameter_complexity": 18496,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 73984,
+            "complexity_score": null
+        },
+        "conv_layers.1.1": {
+            "parameter_complexity": 128,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 512,
+            "complexity_score": null
+        },
+        "conv_layers.1.2": {
+            "parameter_complexity": 0,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 0,
+            "complexity_score": null
+        },
+        "conv_layers.1.3": {
+            "parameter_complexity": 0,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 0,
+            "complexity_score": null
+        },
+        "conv_layers.2": {
+            "parameter_complexity": 74112,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 296448,
+            "complexity_score": null
+        },
+        "conv_layers.2.0": {
+            "parameter_complexity": 73856,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 295424,
+            "complexity_score": null
+        },
+        "conv_layers.2.1": {
+            "parameter_complexity": 256,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 1024,
+            "complexity_score": null
+        },
+        "conv_layers.2.2": {
+            "parameter_complexity": 0,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 0,
+            "complexity_score": null
+        },
+        "conv_layers.2.3": {
+            "parameter_complexity": 0,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 0,
+            "complexity_score": null
+        },
+        "fc_layers": {
+            "parameter_complexity": 25724032,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 102896128,
+            "complexity_score": null
+        },
+        "fc_layers.0": {
+            "parameter_complexity": 25690368,
+            "computational_complexity": 51380736,
+            "io_complexity": 0,
+            "memory_footprint": 102761472,
+            "complexity_score": 13.926560227122703
+        },
+        "fc_layers.1": {
+            "parameter_complexity": 512,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 2048,
+            "complexity_score": null
+        },
+        "fc_layers.2": {
+            "parameter_complexity": 0,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 0,
+            "complexity_score": null
+        },
+        "fc_layers.3": {
+            "parameter_complexity": 0,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 0,
+            "complexity_score": null
+        },
+        "fc_layers.4": {
+            "parameter_complexity": 32896,
+            "computational_complexity": 65792,
+            "io_complexity": 0,
+            "memory_footprint": 131584,
+            "complexity_score": 8.598143951275848
+        },
+        "fc_layers.5": {
+            "parameter_complexity": 256,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 1024,
+            "complexity_score": null
+        },
+        "fc_layers.6": {
+            "parameter_complexity": 0,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 0,
+            "complexity_score": null
+        },
+        "fc_layers.7": {
+            "parameter_complexity": 0,
+            "computational_complexity": null,
+            "io_complexity": 0,
+            "memory_footprint": 0,
+            "complexity_score": null
+        },
+        "head": {
+            "parameter_complexity": 129,
+            "computational_complexity": 258,
+            "io_complexity": 0,
+            "memory_footprint": 516,
+            "complexity_score": 4.165108795713316
+        }
+    },
+    "weight_distributions": {
+        "conv_layers": {
+            "estimated_mean": 0.0,
+            "estimated_std": null,
+            "distribution_type": "unknown"
+        },
+        "conv_layers.0": {
+            "estimated_mean": 0.0,
+            "estimated_std": null,
+            "distribution_type": "unknown"
+        },
+        "conv_layers.0.0": {
+            "estimated_mean": 0.0,
+            "estimated_std": 0.0472455591261534,
+            "distribution_type": "he_normal"
+        },
+        "conv_layers.0.1": {
+            "estimated_mean": 0.0,
+            "estimated_std": null,
+            "distribution_type": "unknown"
+        },
+        "conv_layers.1": {
+            "estimated_mean": 0.0,
+            "estimated_std": null,
+            "distribution_type": "unknown"
+        },
+        "conv_layers.1.0": {
+            "estimated_mean": 0.0,
+            "estimated_std": 0.010398629135096288,
+            "distribution_type": "he_normal"
+        },
+        "conv_layers.1.1": {
+            "estimated_mean": 0.0,
+            "estimated_std": null,
+            "distribution_type": "unknown"
+        },
+        "conv_layers.2": {
+            "estimated_mean": 0.0,
+            "estimated_std": null,
+            "distribution_type": "unknown"
+        },
+        "conv_layers.2.0": {
+            "estimated_mean": 0.0,
+            "estimated_std": 0.005203818089022666,
+            "distribution_type": "he_normal"
+        },
+        "conv_layers.2.1": {
+            "estimated_mean": 0.0,
+            "estimated_std": null,
+            "distribution_type": "unknown"
+        },
+        "fc_layers": {
+            "estimated_mean": 0.0,
+            "estimated_std": null,
+            "distribution_type": "unknown"
+        },
+        "fc_layers.0": {
+            "estimated_mean": 0.0,
+            "estimated_std": 0.00027901646152707945,
+            "distribution_type": "xavier"
+        },
+        "fc_layers.1": {
+            "estimated_mean": 0.0,
+            "estimated_std": null,
+            "distribution_type": "unknown"
+        },
+        "fc_layers.4": {
+            "estimated_mean": 0.0,
+            "estimated_std": 0.007797167257906768,
+            "distribution_type": "xavier"
+        },
+        "fc_layers.5": {
+            "estimated_mean": 0.0,
+            "estimated_std": null,
+            "distribution_type": "unknown"
+        },
+        "head": {
+            "estimated_mean": 0.0,
+            "estimated_std": 0.12403473458920845,
+            "distribution_type": "xavier"
+        }
+    },
+    "sequential_paths": [
+        [
+            {
+                "id": "conv_layers",
+                "type": "ModuleList"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.0",
+                "type": "Sequential"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.0.0",
+                "type": "Conv2d"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.0.1",
+                "type": "BatchNorm2d"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.0.2",
+                "type": "ReLU"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.0.3",
+                "type": "MaxPool2d"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.1",
+                "type": "Sequential"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.1.0",
+                "type": "Conv2d"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.1.1",
+                "type": "BatchNorm2d"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.1.2",
+                "type": "ReLU"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.1.3",
+                "type": "MaxPool2d"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.2",
+                "type": "Sequential"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.2.0",
+                "type": "Conv2d"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.2.1",
+                "type": "BatchNorm2d"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.2.2",
+                "type": "ReLU"
+            }
+        ],
+        [
+            {
+                "id": "conv_layers.2.3",
+                "type": "MaxPool2d"
+            }
+        ],
+        [
+            {
+                "id": "fc_layers",
+                "type": "Sequential"
+            }
+        ],
+        [
+            {
+                "id": "fc_layers.0",
+                "type": "Linear"
+            }
+        ],
+        [
+            {
+                "id": "fc_layers.1",
+                "type": "BatchNorm1d"
+            }
+        ],
+        [
+            {
+                "id": "fc_layers.2",
+                "type": "ReLU"
+            }
+        ],
+        [
+            {
+                "id": "fc_layers.3",
+                "type": "Dropout"
+            }
+        ],
+        [
+            {
+                "id": "fc_layers.4",
+                "type": "Linear"
+            }
+        ],
+        [
+            {
+                "id": "fc_layers.5",
+                "type": "BatchNorm1d"
+            }
+        ],
+        [
+            {
+                "id": "fc_layers.6",
+                "type": "ReLU"
+            }
+        ],
+        [
+            {
+                "id": "fc_layers.7",
+                "type": "Dropout"
+            }
+        ],
+        [
+            {
+                "id": "head",
+                "type": "Linear"
+            }
+        ]
+    ],
+    "parameter_efficiency": {
+        "flops_per_param": 0.9945389730044769,
+        "params_utilization": 1.0,
+        "relative_efficiency": 1.0
+    },
+    "model_complexity": {
+        "total_params": 51729281,
+        "total_flops": 51446786,
+        "total_memory": 206917124,
+        "flops_per_param": 0.9945389730044769,
+        "gflops": 0.051446786,
+        "hardware_estimates": {
+            "cpu_inference_ms": 0.51446786,
+            "gpu_inference_ms": 0.025723393,
+            "mobile_inference_ms": 2.5723393
+        },
+        "complexity_class": "very light"
+    },
+    "layer_connectivity": {
+        "avg_indegree": 0,
+        "avg_outdegree": 0,
+        "max_indegree": 0,
+        "max_outdegree": 0,
+        "bottleneck_layers": [],
+        "hub_layers": []
+    }
+}

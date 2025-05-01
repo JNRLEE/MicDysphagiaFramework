@@ -1,0 +1,16 @@
+{
+  "original_file": "./Probe0_RX_IN_TDM4CH0.wav",
+  "sample_rate": 32000,
+  "token_shape": [
+    1,
+    1,
+    396
+  ],
+  "feature_shape": [
+    1,
+    512,
+    396
+  ],
+  "processing_time": "2025-03-02T15:11:55.208066",
+  "storage_format": "NPZ file containing both 'features' and 'discrete_code'"
+}

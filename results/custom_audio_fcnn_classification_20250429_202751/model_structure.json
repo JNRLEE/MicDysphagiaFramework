@@ -1,0 +1,221 @@
+{
+  "model_type": "FCNN",
+  "model_class": "FCNN",
+  "total_parameters": 690945,
+  "trainable_parameters": 690945,
+  "layers": [
+    {
+      "name": "feature_extractor",
+      "type": "Sequential",
+      "parameters": 690816,
+      "trainable_parameters": 690816
+    },
+    {
+      "name": "feature_extractor.0",
+      "type": "Linear",
+      "parameters": 524800,
+      "trainable_parameters": 524800
+    },
+    {
+      "name": "feature_extractor.1",
+      "type": "BatchNorm1d",
+      "parameters": 1024,
+      "trainable_parameters": 1024
+    },
+    {
+      "name": "feature_extractor.2",
+      "type": "ReLU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "feature_extractor.3",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "feature_extractor.4",
+      "type": "Linear",
+      "parameters": 131328,
+      "trainable_parameters": 131328
+    },
+    {
+      "name": "feature_extractor.5",
+      "type": "BatchNorm1d",
+      "parameters": 512,
+      "trainable_parameters": 512
+    },
+    {
+      "name": "feature_extractor.6",
+      "type": "ReLU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "feature_extractor.7",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "feature_extractor.8",
+      "type": "Linear",
+      "parameters": 32896,
+      "trainable_parameters": 32896
+    },
+    {
+      "name": "feature_extractor.9",
+      "type": "BatchNorm1d",
+      "parameters": 256,
+      "trainable_parameters": 256
+    },
+    {
+      "name": "feature_extractor.10",
+      "type": "ReLU",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "feature_extractor.11",
+      "type": "Dropout",
+      "parameters": 0,
+      "trainable_parameters": 0
+    },
+    {
+      "name": "head",
+      "type": "Linear",
+      "parameters": 129,
+      "trainable_parameters": 129
+    }
+  ],
+  "parameters": [
+    {
+      "name": "feature_extractor.0.weight",
+      "shape": [
+        512,
+        1024
+      ],
+      "size": 524288,
+      "trainable": true
+    },
+    {
+      "name": "feature_extractor.0.bias",
+      "shape": [
+        512
+      ],
+      "size": 512,
+      "trainable": true
+    },
+    {
+      "name": "feature_extractor.1.weight",
+      "shape": [
+        512
+      ],
+      "size": 512,
+      "trainable": true
+    },
+    {
+      "name": "feature_extractor.1.bias",
+      "shape": [
+        512
+      ],
+      "size": 512,
+      "trainable": true
+    },
+    {
+      "name": "feature_extractor.4.weight",
+      "shape": [
+        256,
+        512
+      ],
+      "size": 131072,
+      "trainable": true
+    },
+    {
+      "name": "feature_extractor.4.bias",
+      "shape": [
+        256
+      ],
+      "size": 256,
+      "trainable": true
+    },
+    {
+      "name": "feature_extractor.5.weight",
+      "shape": [
+        256
+      ],
+      "size": 256,
+      "trainable": true
+    },
+    {
+      "name": "feature_extractor.5.bias",
+      "shape": [
+        256
+      ],
+      "size": 256,
+      "trainable": true
+    },
+    {
+      "name": "feature_extractor.8.weight",
+      "shape": [
+        128,
+        256
+      ],
+      "size": 32768,
+      "trainable": true
+    },
+    {
+      "name": "feature_extractor.8.bias",
+      "shape": [
+        128
+      ],
+      "size": 128,
+      "trainable": true
+    },
+    {
+      "name": "feature_extractor.9.weight",
+      "shape": [
+        128
+      ],
+      "size": 128,
+      "trainable": true
+    },
+    {
+      "name": "feature_extractor.9.bias",
+      "shape": [
+        128
+      ],
+      "size": 128,
+      "trainable": true
+    },
+    {
+      "name": "head.weight",
+      "shape": [
+        1,
+        128
+      ],
+      "size": 128,
+      "trainable": true
+    },
+    {
+      "name": "head.bias",
+      "shape": [
+        1
+      ],
+      "size": 1,
+      "trainable": true
+    }
+  ],
+  "key_layers": {
+    "fc_0": "feature_extractor.0",
+    "fc_1": "feature_extractor.4",
+    "fc_2": "feature_extractor.8",
+    "fc_3": "head"
+  },
+  "key_parameters": {
+    "largest_param_0": "feature_extractor.0.weight",
+    "largest_param_1": "feature_extractor.4.weight",
+    "largest_param_2": "feature_extractor.8.weight"
+  }
+}
