@@ -1,0 +1,21 @@
+Metadata-Version: 2.2
+Name: MicDysphagiaFramework
+Version: 0.1.0
+Summary: 用於吞嚥障礙評估的統一框架
+Home-page: https://github.com/your-username/MicDysphagiaFramework
+Author: Your Name / Organization
+Author-email: your.email@example.com
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Requires-Python: >=3.8
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: home-page
+Dynamic: requires-python
+Dynamic: summary

@@ -525,7 +525,7 @@ class PyTorchTrainer:
                     if inputs is not None:
                          # 確保 inputs 也是 Tensor 才進行 detach 和 cpu 操作
                          if isinstance(inputs, torch.Tensor):
-                        all_raw_inputs.append(inputs.detach().cpu())
+                             all_raw_inputs.append(inputs.detach().cpu())
                          else:
                               # 如果 inputs 不是 Tensor (例如路徑列表)，直接附加或進行其他處理
                               # all_raw_inputs.append(inputs) # 根據需要調整

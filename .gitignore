@@ -24,3 +24,8 @@ Thumbs.db
 
 # Jupyter Notebook
 .ipynb_checkpoints
+
+# results訓練結果
+*.pt
+*.pth
+*.json
