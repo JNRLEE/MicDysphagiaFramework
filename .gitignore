@@ -1,125 +1,24 @@
-# 音頻數據文件
-*.wav
-*.mp3
-*.flac
-*.ogg
-*.mp4
-
-# 數據文件
-*.csv
-*.h5
-*.npy
-*.npz
-*.pkl
-*.pth
-*.pt
-*.bin
-*.onnx
-*.model
-*.ckpt
-
-# 虛擬環境
-.venv/
-venv/
-env/
-virtualenv/
-.env
-.conda/
-conda-env/
+# 指定忽略的資料夾
+tests/dataloader_test/
+data/Preparing/
+data/Processed(Cut)/
 
 # Python編譯文件
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 
-# 日誌和臨時文件
-tmp/
-temp/
-.~*
-~*
-*.bak
-*.swp
+# 系統文件
+.DS_Store
+Thumbs.db
+.directory
 
 # 編輯器和IDE文件
 .idea/
 .vscode/
 *.swp
 *.swo
-.DS_Store
-*.sublime*
-.atom/
-.project
-.settings/
 .cursor/
 
 # Jupyter Notebook
 .ipynb_checkpoints
-*.ipynb
-
-# 實驗輸出
-wandb/
-tensorboard/
-
-# 系統文件
-.DS_Store
-Thumbs.db
-.directory
-desktop.ini
-$RECYCLE.BIN/
-
-# 敏感配置或證書
-*.pem
-*.key
-*.crt
-*_credentials.json
-*credentials*.json
-*config*.json
-*secrets*.yaml
-*secrets*.yml
-
-# 特定目錄中的大型數據文件
-data/**/*.wav
-data/**/*.mp3
-data/**/*.csv
-data/**/*.npy
-data/**/*.npz
-data/**/*.h5
-
-results/**/*.pth
-results/**/*.pt
-results/**/*.ckpt
-results/**/*.pkl
-results/**/*.npy
-results/**/*.npz
-results/**/*.csv
-
-# 保留目錄結構
-!**/.gitkeep
-
-# 明確不忽略的文件類型
-!**/*.py
-!**/*.md
-!**/requirements.txt
-!**/setup.py
-!**/README*
-!**/LICENSE*
-!**/*.yaml
-!**/*.yml
-!**/config/*.json 
