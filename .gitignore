@@ -2,6 +2,8 @@
 tests/dataloader_test/
 data/Preparing/
 data/Processed(Cut)/
+.venv/
+venv/
 
 # Python編譯文件
 __pycache__/
