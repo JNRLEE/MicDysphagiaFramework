@@ -1,0 +1,191 @@
+# 全局配置
+global:
+  experiment_name: 'default_experiment'  # 實驗名稱，用於日誌和輸出目錄
+  seed: 42  # 隨機種子，確保結果可重現
+  debug: false  # 是否開啟調試模式
+  device: 'auto'  # 使用的設備，'auto', 'cpu', 'cuda', 'cuda:0', 'cuda:1', ...
+  output_dir: 'outputs'  # 輸出目錄
+  logging_level: 'INFO'  # 日誌級別，'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'
+
+# 數據配置
+data:
+  type: 'audio'  # 數據類型，'audio', 'spectrogram', 'feature'
+  
+  # 新增索引CSV支持
+  use_index: false  # 是否使用索引CSV加載數據
+  index_path: 'data/data_index.csv'  # 索引CSV文件路徑
+  label_field: 'score'  # 標籤欄位名稱，'score', 'DrLee_Evaluation', 'DrTai_Evaluation', 'selection'
+  filter_criteria:  # 篩選條件
+    status: null  # 數據處理狀態，'raw', 'processed', 'failed'，或null表示不篩選
+    selection: null  # 錄音時的動作類型，如'乾吞嚥1口'，或null表示不篩選
+  
+  # 數據源
+  source:
+    wav_dir: 'data/raw'  # 音頻文件目錄
+    spectrogram_dir: 'data/spectrograms'  # 頻譜圖目錄
+    feature_dir: 'data/features'  # 特徵向量目錄
+  
+  # 數據預處理
+  preprocessing:
+    # 音頻預處理
+    audio:
+      sample_rate: 16000  # 採樣率
+      duration: 5.0  # 音頻長度（秒）
+      normalize: true  # 是否規範化
+      target_file: 'Probe0_RX_IN_TDM4CH0.wav'  # 目標音頻文件名
+    
+    # 頻譜圖預處理
+    spectrogram:
+      method: 'mel'  # 頻譜圖類型，'mel', 'stft'
+      n_mels: 128  # Mel濾波器數量
+      n_fft: 1024  # FFT窗口大小
+      hop_length: 512  # 跳躍長度
+      log_mel: true  # 是否使用對數Mel頻譜圖
+      target_duration_sec: 5  # 目標持續時間（秒）
+      save_dir: 'data/spectrograms'  # 頻譜圖保存目錄
+      scaling_method: 'standard'  # 縮放方法，'minmax', 'standard', 'none'
+    
+    # 特徵提取
+    features:
+      method: null  # 特徵提取方法，'mel_spectrogram', 'mfcc', 'chroma', 'spectral_contrast', 'tonnetz'
+      n_mels: 128  # Mel濾波器數量
+      n_mfcc: 20  # MFCC係數數量
+      n_fft: 1024  # FFT窗口大小
+      hop_length: 512  # 跳躍長度
+      power: 2.0  # 頻譜的指數
+  
+  # 數據過濾
+  filtering:
+    task_type: 'classification'  # 任務類型，'classification', 'regression'
+    custom_classification:
+      enabled: false  # 是否啟用自定義分類
+      class_file: 'config/custom_classes.json'  # 自定義分類配置文件
+    score_thresholds:
+      normal: 3  # 正常分數閾值
+      patient: 15  # 患者分數閾值
+    class_config:
+      num_classes: 3  # 分類數量
+    subject_source:
+      normal_prefix: []  # 正常樣本前綴
+      patient_prefix: []  # 患者樣本前綴
+  
+  # 數據集拆分
+  splits:
+    train_ratio: 0.7  # 訓練集比例
+    val_ratio: 0.15  # 驗證集比例
+    test_ratio: 0.15  # 測試集比例
+    split_seed: 42  # 拆分種子
+    split_by_patient: true  # 是否按患者ID拆分
+  
+  # 數據轉換
+  transforms:
+    train:  # 訓練集轉換
+      time_shift:
+        enabled: true  # 是否啟用時間偏移
+        max_shift_sec: 0.5  # 最大偏移時間（秒）
+      volume_scale:
+        enabled: true  # 是否啟用音量縮放
+        min_scale: 0.5  # 最小縮放因子
+        max_scale: 2.0  # 最大縮放因子
+      time_stretch:
+        enabled: false  # 是否啟用時間拉伸
+        rate_range: [0.9, 1.1]  # 拉伸率範圍
+    val:  # 驗證集轉換
+      # 驗證集通常不需要數據增強
+    test:  # 測試集轉換
+      # 測試集通常不需要數據增強
+  
+  # 數據加載器配置
+  dataloader:
+    batch_size: 32  # 批次大小
+    num_workers: 4  # 工作線程數
+    pin_memory: true  # 是否將數據加載到固定內存中
+    drop_last: false  # 是否丟棄最後不足一個批次的數據
+
+# 模型配置
+model:
+  type: 'swin_transformer'  # 模型類型，'swin_transformer', 'fcnn', 'cnn', 'resnet'
+  parameters:  # 模型參數
+    model_name: 'swin_tiny_patch4_window7_224'  # 模型名稱
+    pretrained: true  # 是否使用預訓練權重
+    num_classes: 1  # 輸出類別數量
+    input_channels: 3  # 輸入通道數
+    is_classification: false  # 是否為分類任務
+
+# 訓練配置
+training:
+  epochs: 100  # 訓練輪數
+  early_stopping:
+    enabled: true  # 是否啟用早停
+    patience: 10  # 早停耐心
+    min_delta: 0.001  # 最小改進閾值
+  
+  # 優化器配置
+  optimizer:
+    type: 'Adam'  # 優化器類型，'Adam', 'SGD', 'RMSprop'
+    parameters:
+      lr: 0.001  # 學習率
+      weight_decay: 0.0001  # 權重衰減
+  
+  # 學習率調度器配置
+  lr_scheduler:
+    type: 'CosineAnnealingWarmRestarts'  # 調度器類型，'StepLR', 'CosineAnnealingLR', 'ReduceLROnPlateau', 'CosineAnnealingWarmRestarts'
+    parameters:
+      T_0: 10  # 重啟周期
+      T_mult: 2  # 周期倍乘因子
+      eta_min: 1.0e-6  # 最小學習率
+  
+  # 損失函數配置
+  loss:
+    type: 'MSELoss'  # 損失函數類型，'MSELoss', 'L1Loss', 'CrossEntropyLoss', 'BCELoss', 'MarginRankingLoss', 'RankNetLoss', 'ListMLELoss', 'ApproxNDCGLoss', 'LambdaRankLoss'
+    parameters:
+      reduction: 'mean'  # 減少方法，'mean', 'sum', 'none'
+  
+  # 梯度裁剪配置
+  gradient_clipping:
+    enabled: true  # 是否啟用梯度裁剪
+    max_norm: 1.0  # 最大範數
+
+# 評估配置
+evaluation:
+  metrics:  # 評估指標
+    - 'mse'  # 均方誤差
+    - 'mae'  # 平均絕對誤差
+    - 'r2'  # R平方
+  
+  # 驗證配置
+  validation:
+    frequency: 1  # 每隔多少輪驗證一次
+    best_model_metric: 'mse'  # 最佳模型的指標
+    best_model_mode: 'min'  # 最佳模型的模式，'min', 'max'
+  
+  # 推理配置
+  inference:
+    batch_size: 32  # 推理批次大小
+    save_predictions: true  # 是否保存預測結果
+
+# 可視化配置
+visualization:
+  enabled: true  # 是否啟用可視化
+  
+  # TensorBoard配置
+  tensorboard:
+    enabled: true  # 是否啟用TensorBoard
+    log_dir: 'tensorboard_logs'  # 日誌目錄
+    log_histogram: false  # 是否記錄直方圖
+  
+  # 混淆矩陣配置
+  confusion_matrix:
+    enabled: true  # 是否啟用混淆矩陣
+    normalize: 'true'  # 是否規範化
+  
+  # t-SNE配置
+  tsne:
+    enabled: false  # 是否啟用t-SNE
+    perplexity: 30  # 困惑度
+    n_components: 2  # 降維後的維度
+  
+  # 可視化提示
+  visual_prompting:
+    enabled: false  # 是否啟用可視化提示
+    prompts_dir: 'prompts'  # 提示目錄 

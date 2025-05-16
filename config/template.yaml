@@ -276,3 +276,42 @@ analysis:
       - 'isolation_forest'                # 隔離森林
       - 'local_outlier_factor'            # 局部異常因子
     threshold: 0.95                       # 異常閾值
+
+visualization:
+  tensorboard:
+    enabled: true
+    update_frequency: 1
+  save_images:
+    enabled: true
+    confusion_matrix: true
+    roc_curve: true
+    prediction_histogram: true
+    feature_importance: false
+  tsne:
+    enabled: false
+    perplexity: 30
+    n_iter: 1000
+    learning_rate: 200
+
+# 鉤子配置：用於收集模型分析數據和測試集結果
+hooks:
+  # 模型分析鉤子：收集層激活值和梯度
+  model_analytics:
+    enabled: false
+    monitored_layers: []  # 要監控的層，如 ['encoder.final_layer', 'head.pre_logits']
+    monitored_params: []  # 要監控的參數，如 ['encoder.layer1.weight', 'head.weight']
+    save_frequency: 1  # 保存頻率（每 N 個 epoch 保存一次）
+    save_validation_predictions: true  # 是否在每個 epoch 保存驗證集預測結果
+  
+  # 評估結果捕獲鉤子：收集測試集的真實標籤和模型預測（用於混淆矩陣）
+  evaluation_capture:
+    enabled: false
+    datasets: ['test']  # 要捕獲結果的數據集
+    save_probabilities: true  # 是否保存類別概率（用於 ROC 曲線）
+  
+  # 激活值捕獲鉤子：收集特定層的激活值（用於餘弦相似度圖）
+  activation_capture:
+    enabled: false
+    target_layers: []  # 要捕獲激活值的層名稱列表
+    datasets: ['test']  # 在哪些數據集上捕獲
+    include_sample_ids: true  # 是否包含樣本ID

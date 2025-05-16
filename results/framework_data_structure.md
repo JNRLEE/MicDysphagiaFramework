@@ -5,6 +5,7 @@
 ## 目錄結構
 
 每個實驗會在 `results/` 下創建一個子目錄，命名格式為 `{實驗名稱}_{時間戳}`。例如：
+
 ```
 results/
 └── audio_swin_regression_20250417_142912/
@@ -17,20 +18,24 @@ results/
     │   └── checkpoint_epoch_1.pth  # 第1輪模型權重檢查點
     ├── hooks/                      # 模型鉤子數據
     │   ├── training_summary.pt     # 整體訓練摘要
-    │   ├── evaluation_results_test.pt  # 測試集評估結果
+    │   ├── evaluation_results_test.pt  # 驗證集評估結果
+    │   ├── epoch_0_validation_predictions.pt  # 第0輪驗證集預測結果
+    │   ├── epoch_1_validation_predictions.pt  # 第1輪驗證集預測結果
+    │   ├── test_set_activations_feature_extractor.pt # 測試集特徵提取器激活值
     │   ├── epoch_0/                # 第0輪數據
     │   │   ├── epoch_summary.pt    # 輪次摘要
     │   │   ├── batch_0_data.pt     # 第0批次數據
     │   │   ├── head_activation_batch_0.pt  # 頭部層激活值
     │   │   ├── head_gradient_batch_0.pt    # 頭部層梯度張量
     │   │   ├── head_gradient_batch_0_stats.json # 頭部層梯度統計量（含分位數）
-    │   │   ├── head_gradient_batch_0_hist.pt # 頭部層梯度直方圖（新增）
+    │   │   ├── head_gradient_batch_0_hist.pt # 頭部層梯度直方圖
     │   │   └── gns_stats_epoch_0.json      # GNS統計量
     │   └── epoch_1/                # 第1輪數據
     │       └── ...                 # 同上
     ├── results/                    # 實驗結果
     │   └── results.json            # 最終結果摘要
     ├── tensorboard_logs/           # TensorBoard日誌
+    ├── test_predictions.pt         # 測試集評估結果
     └── logs/                       # 訓練日誌
 ```
 
@@ -39,6 +44,7 @@ results/
 ### 1. 配置文件 (`config.json`)
 
 實驗配置的JSON副本，包含完整的實驗參數，包括：
+
 - 模型類型與參數
 - 數據集設置
 - 訓練參數（學習率、批次大小等）
@@ -145,7 +151,7 @@ import json
 
 with open('results/experiment_name/training_history.json', 'r') as f:
     history = json.load(f)
-    
+  
 # 繪製損失曲線
 import matplotlib.pyplot as plt
 plt.figure(figsize=(10, 6))
@@ -248,6 +254,53 @@ layer_name = activation['layer_name']   # 層名稱
 - **讀取方式**: `hist_data = torch.load('path/to/gradient_hist.pt')`
 - **用途**: 用於繪製梯度分布直方圖，視覺化分析梯度分布情況。
 
+#### 驗證集預測 (`epoch_N_validation_predictions.pt`)
+
+- **內容說明**: 每個訓練輪次結束時的驗證集預測結果，包含原始輸出、預測類別和真實標籤。
+- **檔案格式**: PyTorch Dictionary (`.pt`)。
+  ```python
+  validation_data = {
+      'outputs': tensor([...]),    # 模型原始輸出
+      'targets': tensor([...]),    # 真實標籤
+      'predictions': tensor([...]) # 預測類別（對於分類任務）
+  }
+  ```
+- **讀取方式**: `validation_data = torch.load('path/to/epoch_N_validation_predictions.pt')`
+- **用途**: 用於分析模型在每個訓練輪次結束時的驗證集表現，追蹤模型訓練過程中的預測變化。
+
+#### 評估結果 (`evaluation_results_dataset.pt`)
+
+包含在特定數據集上的評估結果：
+
+```python
+evaluation = torch.load('results/experiment_name/hooks/evaluation_results_test.pt')
+metrics = evaluation['metrics']           # 評估指標
+predictions = evaluation['predictions']   # 模型預測
+targets = evaluation['targets']           # 真實標籤
+```
+
+如果是分類任務，還會包括類別概率：
+
+```python
+probabilities = evaluation['probabilities']  # 類別概率（形狀: [樣本數, 類別數]）
+```
+
+#### 層激活值捕獲 (`dataset_set_activations_layer_name.pt`)
+
+- **內容說明**: 特定數據集上特定層的激活值，用於餘弦相似度分析和其他高級模型分析。
+- **檔案格式**: PyTorch Dictionary (`.pt`)。
+  ```python
+  activation_data = {
+      'layer_name': 'feature_extractor',
+      'activations': tensor([...]),  # 形狀: [樣本數, 特徵維度]
+      'targets': tensor([...]),      # 真實標籤
+      'sample_ids': [...],           # 樣本ID (如果提供)
+      'timestamp': '2024-05-02T12:34:56.789Z'
+  }
+  ```
+- **讀取方式**: `activation_data = torch.load('path/to/dataset_set_activations_layer_name.pt')`
+- **用途**: 用於分析模型內部特徵空間，如餘弦相似度圖、t-SNE可視化、特徵聚類等。
+
 #### 評估結果 (`hooks/evaluation_results_test.pt`)
 
 包含在測試集上的評估結果：
@@ -311,6 +364,7 @@ targets = evaluation['targets']           # 真實標籤
    ```
    tensorboard --logdir=results/experiment_name/tensorboard_logs
    ```
-4. 如果實驗提前終止，某些文件可能不存在或不完整 
-5. 每個 epoch 的 GNS 統計量皆儲存於 hooks/epoch_N/gns_stats_epoch_N.json，可直接用於自動化分析與可視化。 
-6. 新增了梯度直方圖數據 (`*_gradient_hist.pt`) 和包含分位數的梯度統計量 (`*_gradient_stats.json`)，可用於更詳細的梯度分析。 
+4. 如果實驗提前終止，某些文件可能不存在或不完整
+5. 每個 epoch 的 GNS 統計量皆儲存於 hooks/epoch_N/gns_stats_epoch_N.json，可直接用於自動化分析與可視化
+6. 每個 epoch 的驗證集預測結果都會保存在 hooks/epoch_N_validation_predictions.pt，可用於分析模型訓練過程中的預測變化
+7. 對於分類任務，評估結果文件將包含類別概率，可用於繪製 ROC 曲線和計算其他進階指標

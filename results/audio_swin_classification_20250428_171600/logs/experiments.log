@@ -1,4 +1,0 @@
-{"event": "save_gns", "epoch": 2, "gns": 0.0, "total_var": 0.0, "mean_norm_sq": 2748712.6341644675, "timestamp": "2025-04-28T17:16:42.550754"}
-{"event": "save_gns", "epoch": 5, "gns": 0.0, "total_var": 0.0, "mean_norm_sq": 1200783.6326637268, "timestamp": "2025-04-28T17:17:25.334661"}
-{"event": "save_gns", "epoch": 2, "gns": 0.0, "total_var": 0.0, "mean_norm_sq": 564236.1703835465, "timestamp": "2025-04-28T17:18:15.305726"}
-{"event": "save_gns", "epoch": 5, "gns": 0.0, "total_var": 0.0, "mean_norm_sq": 366471.6486258656, "timestamp": "2025-04-28T17:18:58.448517"}

@@ -200,4 +200,21 @@ if __name__ == "__main__":
         config = {"type": "NotExistLoss", "parameters": {}}
         loss_fn = LossFactory.get_loss(config)
     except Exception as e:
-        print(f"遇到錯誤type時的報錯（預期行為）: {e}") 
+        print(f"遇到錯誤type時的報錯（預期行為）: {e}")
+
+# 提供模組級別的函數，以便其他模組可以直接導入
+def create_loss_function(config: Dict[str, Any]) -> nn.Module:
+    """
+    從配置創建損失函數
+    
+    Args:
+        config: 配置字典，應包含 'training.loss' 部分
+        
+    Returns:
+        nn.Module: 創建的損失函數
+        
+    Raises:
+        ValueError: 如果損失函數類型不存在
+    """
+    loss_config = config.get('training', {}).get('loss', {})
+    return LossFactory.create_from_config(loss_config) 

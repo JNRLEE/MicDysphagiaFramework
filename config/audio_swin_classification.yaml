@@ -1,5 +1,6 @@
 #python scripts/run_experiments.py --config config/audio_swin_classification.yaml
-# cd /Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My\ Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework && python scripts/run_experiments.py --config config/audio_swin_classification.yaml
+# Linux環境執行命令:
+# cd /home/sbplab/JNRLEE/MicDysphagiaFramework && python scripts/run_experiments.py --config config/audio_swin_classification.yaml
 global:
   experiment_name: 'audio_swin_classification'
   seed: 42
@@ -10,7 +11,9 @@ global:
 data:
   type: 'audio'
   source:
-    wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
+    wav_dir: '/home/sbplab/JNRLEE/MicDysphagiaFramework/data/Processed(Cut)'
+    # 原始路徑（保留為參考）
+    # wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
   preprocessing:
     audio:
       sr: 16000

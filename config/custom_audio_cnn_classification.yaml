@@ -1,6 +1,6 @@
-#python scripts/run_experiments.py --config config/custom_audio_fcnn_classification.yaml
+#python scripts/run_experiments.py --config config/custom_audio_cnn_classification.yaml
 global:
-  experiment_name: 'custom_audio_fcnn_classification'
+  experiment_name: 'custom_audio_cnn_classification'
   seed: 42
   debug: false
   device: 'auto'
@@ -90,15 +90,19 @@ data:
     drop_last: false
 
 model:
-  type: 'fcnn'
+  type: 'cnn'
   parameters:
-    input_dim: 128  # 需要和features.n_mels的值保持一致
-    hidden_layers: [512, 256, 128]
-    num_classes: 10
+    input_channels: 3
+    input_size: [224, 224]
+    filters: [32, 64, 128]
+    kernel_sizes: [3, 3, 3]
+    pool_sizes: [2, 2, 2]
+    fc_dims: [256, 128]
+    num_classes: 1
     dropout_rate: 0.3
+    batch_norm: true
     activation: 'relu'
     is_classification: true
-    batch_norm: true
 
 training:
   epochs: 200
@@ -147,8 +151,10 @@ hooks:
   # 模型分析鉤子：收集層激活值和梯度
   model_analytics:
     enabled: true
-    monitored_layers: ['feature_extractor.0', 'feature_extractor.3', 'feature_extractor.6', 'feature_extractor.9']  # 監控隱藏層
-    monitored_params: ['head.weight']  # 監控輸出層權重
+    # 監控卷積層和全連接層的輸出
+    monitored_layers: ['conv_layers.0', 'conv_layers.1', 'conv_layers.2', 'fc_layers']  # 監控前三個卷積層和全連接層
+    # 監控最後一個全連接層和輸出層的權重
+    monitored_params: ['fc_layers.0.weight', 'head.weight']  # 監控第一個全連接層和輸出層權重
     save_frequency: 1  # 每個 epoch 保存一次
   
   # 評估結果捕獲鉤子：收集測試集的真實標籤和模型預測（用於混淆矩陣）
@@ -159,5 +165,6 @@ hooks:
   # 激活值捕獲鉤子：收集特定層的激活值（用於餘弦相似度圖）
   activation_capture:
     enabled: true
-    target_layers: ['feature_extractor']  # 捕獲特徵提取器的激活值
+    # 捕獲整個全連接層和最後一個卷積層的激活值
+    target_layers: ['fc_layers', 'conv_layers.2']  # 捕獲全連接層和最後一個卷積層的激活值
     datasets: ['test']  # 在測試集上捕獲 

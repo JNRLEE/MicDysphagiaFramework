@@ -10,7 +10,9 @@ global:
 data:
   type: 'audio'
   source:
-    wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
+    wav_dir: '/home/sbplab/JNRLEE/MicDysphagiaFramework/data/Processed(Cut)'
+    # 原始路徑（保留為參考）
+    # wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
   preprocessing:
     audio:
       sr: 16000

@@ -9,7 +9,9 @@ global:
 data:
   type: 'audio'
   source:
-    wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
+    wav_dir: '/home/sbplab/JNRLEE/MicDysphagiaFramework/data/Processed(Cut)'
+    # 原始路徑（保留為參考）
+    # wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
   preprocessing:
     audio:
       sr: 16000
@@ -26,7 +28,9 @@ data:
     # 自定義分類設定 - 只從老闆的Excel檔案中取分類
     custom_classification:
       enabled: true # 啟用自定義分類
-      excel_path: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/data/吞嚥聲音名單(共同編輯).xlsx' # Excel檔案路徑
+      excel_path: '/home/sbplab/JNRLEE/MicDysphagiaFramework/data/吞嚥聲音名單(共同編輯).xlsx' # Excel檔案路徑
+      # 原始路徑（保留為參考）
+      # excel_path: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/data/吞嚥聲音名單(共同編輯).xlsx'
       patient_id_column: 'A' # 患者ID所在欄位
       class_column: 'P' # 分類所在欄位
       # 新增動作類型過濾設定

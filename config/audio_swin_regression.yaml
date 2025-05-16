@@ -1,4 +1,5 @@
 # python scripts/run_experiments.py --config config/audio_swin_regression.yaml
+# Linux環境執行命令:
 # conda activate micdys && python MicDysphagiaFramework/scripts/run_experiments.py --config MicDysphagiaFramework/config/audio_swin_regression.yaml
 # python -m scripts.run_experiments --config config/audio_swin_regression.yaml
 
@@ -12,7 +13,9 @@ global:
 data:
   type: 'audio'
   source:
-    wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
+    wav_dir: '/home/sbplab/JNRLEE/MicDysphagiaFramework/data/Processed(Cut)'
+    # 原始路徑（保留為參考）
+    # wav_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
   preprocessing:
     audio:
       sr: 16000

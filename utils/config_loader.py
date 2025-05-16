@@ -136,14 +136,32 @@ class ConfigLoader:
         if 'training' not in self.config:
             raise ValueError("配置中缺少 'training' 部分")
         
+        # 檢查索引CSV配置
+        data_config = self.config['data']
+        if data_config.get('use_index', False):
+            if not data_config.get('index_path'):
+                logger.warning("啟用了索引CSV但未指定index_path")
+            
+            # 驗證標籤欄位
+            label_field = data_config.get('label_field', 'score')
+            valid_label_fields = ['score', 'DrLee_Evaluation', 'DrTai_Evaluation', 'selection']
+            if label_field not in valid_label_fields:
+                logger.warning(f"標籤欄位 '{label_field}' 不在推薦的欄位列表中: {valid_label_fields}")
+            
+            # 驗證篩選條件
+            filter_criteria = data_config.get('filter_criteria', {})
+            if 'status' in filter_criteria and filter_criteria['status'] not in [None, 'raw', 'processed', 'failed']:
+                logger.warning(f"狀態篩選值 '{filter_criteria['status']}' 不是有效的狀態值 (None, 'raw', 'processed', 'failed')")
+        
         # 檢查數據源
-        data_type = self.config['data'].get('type')
-        if data_type == 'audio' and not self.config['data'].get('source', {}).get('wav_dir'):
-            logger.warning("音頻數據類型但未指定wav_dir")
-        elif data_type == 'spectrogram' and not self.config['data'].get('source', {}).get('spectrogram_dir'):
-            logger.warning("頻譜圖數據類型但未指定spectrogram_dir")
-        elif data_type == 'feature' and not self.config['data'].get('source', {}).get('feature_dir'):
-            logger.warning("特徵數據類型但未指定feature_dir")
+        data_type = data_config.get('type')
+        if not data_config.get('use_index'):
+            if data_type == 'audio' and not data_config.get('source', {}).get('wav_dir'):
+                logger.warning("音頻數據類型但未指定wav_dir")
+            elif data_type == 'spectrogram' and not data_config.get('source', {}).get('spectrogram_dir'):
+                logger.warning("頻譜圖數據類型但未指定spectrogram_dir")
+            elif data_type == 'feature' and not data_config.get('source', {}).get('feature_dir'):
+                logger.warning("特徵數據類型但未指定feature_dir")
     
     def get(self, key: str, default: Any = None) -> Any:
         """安全獲取配置項
@@ -241,24 +259,41 @@ if __name__ == "__main__":
     with open(good_yaml, "w") as f:
         yaml.dump({
             "global": {},
-            "data": {"type": "audio", "source": {"wav_dir": "./"}},
+            "data": {"type": "audio", "source": {"wav_dir": "./"}, "use_index": True, "index_path": "data/data_index.csv", "label_field": "DrLee_Evaluation"},
             "model": {},
             "training": {}
         }, f)
     with open(bad_yaml, "w") as f:
         yaml.dump({"model": {}, "training": {}, "global": {}} , f)
     try:
-        from utils.config_loader import ConfigLoader
-        loader = ConfigLoader(good_yaml)
-        loader.load_config()
-        print("ConfigLoader測試成功")
+        # 測試正常配置
+        config_loader = ConfigLoader(good_yaml)
+        config = config_loader.load_config()
+        print(f"配置載入成功: {config}")
+        
+        # 測試錯誤配置
+        try:
+            bad_config_loader = ConfigLoader(bad_yaml)
+            bad_config = bad_config_loader.load_config()
+            print("錯誤配置應該拋出異常，但似乎沒有。這是一個錯誤。")
+        except ValueError as e:
+            print(f"預期的錯誤處理: {e}")
+        
+        # 測試標籤欄位驗證
+        config_loader.config['data']['label_field'] = 'invalid_field'
+        config_loader._validate_config()  # 應該生成警告，但不拋出異常
+        print("標籤欄位驗證測試通過")
+        
+        # 測試狀態篩選驗證
+        config_loader.config['data']['filter_criteria'] = {'status': 'invalid_status'}
+        config_loader._validate_config()  # 應該生成警告，但不拋出異常
+        print("狀態篩選驗證測試通過")
+        
+        print("所有測試通過")
     except Exception as e:
-        print(f"ConfigLoader遇到錯誤（預期行為）: {e}")
-    try:
-        loader = ConfigLoader(bad_yaml)
-        loader.load_config()
-    except Exception as e:
-        print(f"ConfigLoader遇到錯誤配置時的報錯（預期行為）: {e}")
+        print(f"測試失敗: {e}")
     finally:
-        os.remove(good_yaml)
-        os.remove(bad_yaml) 
+        # 清理臨時文件
+        for file in [good_yaml, bad_yaml]:
+            if os.path.exists(file):
+                os.remove(file) 

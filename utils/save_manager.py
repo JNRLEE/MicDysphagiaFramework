@@ -262,6 +262,74 @@ class SaveManager:
         epoch_dir = os.path.join(self.get_path('hooks', f'epoch_{epoch}'))
         os.makedirs(epoch_dir, exist_ok=True)
         
+        # 定義內部函數用於安全計算分位數（防止記憶體溢出）
+        def safe_quantile(tensor, q):
+            """以記憶體友好的方式計算分位數
+            
+            Args:
+                tensor: 輸入張量
+                q: 分位數值 (例如 [0.25, 0.5, 0.75])
+                
+            Returns:
+                torch.Tensor: 計算的分位數結果
+            """
+            # 將輸入張量移至CPU，以防它在GPU上
+            if tensor.device.type != 'cpu':
+                tensor = tensor.cpu()
+                
+            # 攤平張量
+            flat = tensor.view(-1)
+            
+            # 設定批次大小 (每批次最多處理這麼多元素)
+            chunk_size = 1000000  # 100萬個元素
+            
+            # 如果張量很小，直接計算
+            if flat.numel() <= chunk_size:
+                return torch.quantile(flat, q, interpolation='linear')
+            
+            # 對於大張量，使用近似方法
+            # 1. 收集所有批次的分位數
+            quantiles_list = []
+            num_chunks = (flat.numel() + chunk_size - 1) // chunk_size  # 向上取整
+            
+            # 2. 從每個批次中收集樣本
+            samples = []
+            step = max(1, flat.numel() // (chunk_size // 10))  # 採樣步長
+            indices = torch.arange(0, flat.numel(), step)
+            
+            # 限制樣本數量
+            if indices.numel() > chunk_size:
+                indices = indices[:chunk_size]
+                
+            samples = flat[indices]
+            
+            # 3. 使用樣本計算分位數
+            try:
+                return torch.quantile(samples, q, interpolation='linear')
+            except Exception as e:
+                logger.warning(f"使用樣本計算分位數時出錯: {e}，返回估計值")
+                # 返回一個估計值（最小值、中值和最大值的插值）
+                if isinstance(q, torch.Tensor):
+                    min_val = float(torch.min(samples).item())
+                    max_val = float(torch.max(samples).item())
+                    median = float(torch.median(samples).item())
+                    
+                    # 根據q的值估計分位數
+                    results = []
+                    for qi in q:
+                        qi_float = float(qi.item())
+                        if qi_float <= 0.25:
+                            # 在最小值和中位數之間插值
+                            val = min_val + (median - min_val) * (qi_float / 0.5)
+                        else:
+                            # 在中位數和最大值之間插值
+                            val = median + (max_val - median) * ((qi_float - 0.5) / 0.5)
+                        results.append(val)
+                    return torch.tensor(results)
+                else:
+                    # 如果q不是張量，返回一個合理的預設值
+                    return torch.tensor([0.0])
+        
         for name, tensor in gradients.items():
             if tensor is not None:
                 # ========== 1. 保存原始梯度張量 ========== #
@@ -276,37 +344,53 @@ class SaveManager:
                 
                 # ========== 2. 保存詳細統計信息 (含分位數) ========== #
                 # 中文註解：計算基礎統計量與分位數
-                flat_tensor = tensor.view(-1)
-                quantiles = torch.quantile(flat_tensor, torch.tensor([0.25, 0.5, 0.75]), interpolation='linear')
-                stats = {
-                    'mean': float(torch.mean(tensor).item()),
-                    'std': float(torch.std(tensor).item()),
-                    'min': float(torch.min(tensor).item()),
-                    'max': float(torch.max(tensor).item()),
-                    'norm': float(torch.norm(tensor).item()),
-                    'quantile_25': float(quantiles[0].item()),
-                    'quantile_50': float(quantiles[1].item()), # 中位數
-                    'quantile_75': float(quantiles[2].item()),
-                    'timestamp': datetime.now().isoformat(),
-                    'epoch': epoch,
-                    'batch': batch
-                }
+                try:
+                    flat_tensor = tensor.view(-1)
+                    q = torch.tensor([0.25, 0.5, 0.75])
+                    
+                    # 使用記憶體友好的方式計算分位數
+                    quantiles = safe_quantile(flat_tensor, q)
+                    
+                    stats = {
+                        'mean': float(torch.mean(tensor).item()),
+                        'std': float(torch.std(tensor).item()),
+                        'min': float(torch.min(tensor).item()),
+                        'max': float(torch.max(tensor).item()),
+                        'norm': float(torch.norm(tensor).item()),
+                        'quantile_25': float(quantiles[0].item()),
+                        'quantile_50': float(quantiles[1].item()), # 中位數
+                        'quantile_75': float(quantiles[2].item()),
+                        'timestamp': datetime.now().isoformat(),
+                        'epoch': epoch,
+                        'batch': batch
+                    }
+                    
+                    # 中文註解：定義統計量檔案路徑與名稱
+                    stats_filename = os.path.join(
+                        epoch_dir,
+                        os.path.splitext(os.path.basename(save_path))[0] + '_stats.json'
+                    )
+                    
+                    # 中文註解：寫入JSON檔案
+                    with open(stats_filename, 'w') as f:
+                        json.dump(stats, f, indent=2)
+                    saved_paths.append(stats_filename)
                 
-                # 中文註解：定義統計量檔案路徑與名稱
-                stats_filename = os.path.join(
-                    epoch_dir,
-                    os.path.splitext(os.path.basename(save_path))[0] + '_stats.json'
-                )
-                
-                # 中文註解：寫入JSON檔案
-                with open(stats_filename, 'w') as f:
-                    json.dump(stats, f, indent=2)
-                saved_paths.append(stats_filename)
+                except Exception as e:
+                    logger.warning(f"計算或保存參數 '{name}' 的梯度統計信息時出錯: {e}")
 
                 # ========== 3. 保存直方圖數據 ========== #
                 try:
                     # 中文註解：計算直方圖數據
-                    hist_counts, hist_bins = torch.histogram(tensor.cpu(), bins=100) # 可調整bins數量
+                    # 如果張量太大，使用採樣
+                    if tensor.numel() > 1000000:  # 超過100萬個元素時採樣
+                        step = max(1, tensor.numel() // 100000)  # 採樣步長
+                        indices = torch.arange(0, tensor.numel(), step)
+                        samples = tensor.view(-1)[indices]
+                        hist_counts, hist_bins = torch.histogram(samples.cpu(), bins=100) # 可調整bins數量
+                    else:
+                        hist_counts, hist_bins = torch.histogram(tensor.cpu(), bins=100) # 可調整bins數量
+                    
                     hist_data = {
                         'hist': hist_counts,
                         'bin_edges': hist_bins,
@@ -398,21 +482,75 @@ class SaveManager:
         """保存訓練摘要
         
         Args:
-            history: 訓練歷史
-            total_epochs: 總 epoch 數
+            history: 訓練歷史記錄
+            total_epochs: 總訓練 epoch 數
             
         Returns:
             str: 保存的文件路徑
         """
-        save_path = self.get_path('hooks', 'training_summary.pt')
+        save_path = self.get_path('results', 'training_summary.json')
         
-        summary_data = {
-            'timestamp': datetime.now().isoformat(),
+        # 準備要保存的數據 (確保所有數據都是可序列化的)
+        history_serializable = {}
+        for key, value in history.items():
+            # 如果是字典，需要遞歸處理
+            if isinstance(value, dict):
+                history_serializable[key] = {}
+                for k, v in value.items():
+                    if isinstance(v, list):
+                        # 處理列表中的張量
+                        history_serializable[key][k] = []
+                        for item in v:
+                            if hasattr(item, 'item') and callable(item.item):  # 判斷是否為 tensor
+                                try:
+                                    history_serializable[key][k].append(item.item())
+                                except:
+                                    # 如果是多元素張量，使用均值
+                                    history_serializable[key][k].append(float(item.mean().item()) if hasattr(item, 'mean') else None)
+                            else:
+                                history_serializable[key][k].append(item)
+                    else:
+                        # 非列表數據
+                        if hasattr(v, 'item') and callable(v.item):  # 判斷是否為 tensor
+                            try:
+                                history_serializable[key][k] = v.item()
+                            except:
+                                # 如果是多元素張量，使用均值
+                                history_serializable[key][k] = float(v.mean().item()) if hasattr(v, 'mean') else None
+                        else:
+                            history_serializable[key][k] = v
+            elif isinstance(value, list):
+                # 處理一級列表中的張量
+                history_serializable[key] = []
+                for item in value:
+                    if hasattr(item, 'item') and callable(item.item):  # 判斷是否為 tensor
+                        try:
+                            history_serializable[key].append(item.item())
+                        except:
+                            # 如果是多元素張量，使用均值
+                            history_serializable[key].append(float(item.mean().item()) if hasattr(item, 'mean') else None)
+                    else:
+                        history_serializable[key].append(item)
+            else:
+                # 處理一級非列表數據
+                if hasattr(value, 'item') and callable(value.item):  # 判斷是否為 tensor
+                    try:
+                        history_serializable[key] = value.item()
+                    except:
+                        # 如果是多元素張量，使用均值
+                        history_serializable[key] = float(value.mean().item()) if hasattr(value, 'mean') else None
+                else:
+                    history_serializable[key] = value
+        
+        summary = {
             'total_epochs': total_epochs,
-            'history': history
+            'history': history_serializable,
+            'timestamp': datetime.now().isoformat()
         }
         
-        torch.save(summary_data, save_path)
+        with open(save_path, 'w') as f:
+            json.dump(summary, f, indent=2)
+            
         logger.info(f"訓練摘要已保存到: {save_path}")
         return save_path
     
@@ -420,24 +558,39 @@ class SaveManager:
         """保存評估結果
         
         Args:
-            results: 評估結果
-            mode: 評估模式 (例如 'test', 'val')
+            results: 評估結果字典
+            mode: 評估模式，如 'test', 'val' 等
             
         Returns:
             str: 保存的文件路徑
-        """
-        filename = f"evaluation_results{f'_{mode}' if mode else ''}.pt"
-        save_path = self.get_path('hooks', filename)
-        
-        eval_data = {
-            'timestamp': datetime.now().isoformat(),
-            'results': results
-        }
-        
-        if mode:
-            eval_data['mode'] = mode
             
-        torch.save(eval_data, save_path)
+        Description:
+            保存評估結果到標準位置，用於後續分析
+            
+        References:
+            無
+        """
+        if mode:
+            filename = f'evaluation_results_{mode}.json'
+        else:
+            filename = 'evaluation_results.json'
+        
+        save_path = self.get_path('results', filename)
+        
+        # 如果結果包含張量，將其轉換為列表
+        results_json = {}
+        for key, value in results.items():
+            if isinstance(value, torch.Tensor):
+                results_json[key] = value.tolist()
+            else:
+                results_json[key] = value
+        
+        # 添加時間戳
+        results_json['timestamp'] = datetime.now().isoformat()
+        
+        with open(save_path, 'w') as f:
+            json.dump(results_json, f, indent=2)
+            
         logger.info(f"評估結果已保存到: {save_path}")
         return save_path
     

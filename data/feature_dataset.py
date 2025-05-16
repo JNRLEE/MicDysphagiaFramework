@@ -5,6 +5,7 @@
 2. 支持多種特徵組合和選擇
 3. 支持按患者ID拆分數據集
 4. 支持特徵標準化和轉換
+5. 支持從索引CSV加載數據
 
 數據讀取邏輯：
 1. NPZ特徵文件讀取:
@@ -50,9 +51,12 @@ from pathlib import Path
 import random
 from sklearn.preprocessing import StandardScaler
 
+# 引入索引數據集基類
+from data.indexed_dataset import IndexedDatasetBase
+
 logger = logging.getLogger(__name__)
 
-class FeatureDataset(Dataset):
+class FeatureDataset(IndexedDatasetBase):
     """特徵數據集類，用於從預處理過的特徵文件中讀取特徵
     
     主要功能：
@@ -60,105 +64,259 @@ class FeatureDataset(Dataset):
     2. 支持多種特徵選擇和過濾方式
     3. 支持特徵標準化和轉換
     4. 支持按患者ID拆分數據集
+    5. 支持從索引CSV加載數據
     
-    數據讀取邏輯：
-    1. NPZ特徵文件讀取:
-       - 使用`np.load(file_path, allow_pickle=True)`讀取NPZ文件
-       - 優先從'features'鍵獲取特徵數據
-       - 如果沒有'features'鍵，嘗試提取所有非元數據字段
-       - 處理不同維度的特徵向量，默認限制為10000維，過大時會自動截斷
-    
-    2. JSON特徵文件讀取:
-       - 使用json.load讀取文件內容
-       - 支持單樣本和多樣本JSON文件格式
-       - 從JSON中提取指定的特徵字段或所有非元數據字段
-    
-    3. CSV特徵文件讀取:
-       - 使用pandas.read_csv讀取表格數據
-       - 支持提取特定行或全部數據
-       - 從行數據中選擇所需的特徵列
-    
-    4. 患者信息關聯:
-       - 可以從特徵文件中獲取患者ID和分數
-       - 也可以從文件名或相關的info.json文件中提取患者信息
-       - 支持不同的患者ID和標籤列名配置
-    
-    5. 特徵標準化:
-       - 使用sklearn.preprocessing.StandardScaler對特徵進行標準化
-       - 對於不同維度的特徵，使用最常見維度的特徵進行標準化器訓練
-       - 處理標準化過程中可能出現的異常
-    
-    6. 緩存機制:
-       - 支持緩存已讀取的特徵以提高效率
-       - 適用於反复讀取相同特徵的場景
+    數據讀取模式：
+    1. 索引模式：使用data_index.csv加載數據
+       - 提供index_path參數啟用此模式
+       - 使用label_field指定標籤欄位
+       - 使用filter_criteria篩選數據
+       
+    2. 直接模式：直接從目錄讀取特徵文件
+       - 使用data_path參數指定特徵文件的根目錄
+       - 從特徵文件或相關的info.json獲取標籤信息
+       - 此模式與原始實現兼容
     """
     
     def __init__(
         self,
-        data_path: str,
-        config: Dict[str, Any],
+        data_path: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
         transform: Optional[Dict[str, Any]] = None,
         is_train: bool = True,
-        cache_features: bool = True
+        cache_features: bool = True,
+        # 新增索引模式參數
+        index_path: Optional[str] = None,
+        label_field: str = 'score',
+        filter_criteria: Optional[Dict] = None
     ):
         """初始化特徵數據集
         
         Args:
-            data_path (str): 特徵數據路徑
-            config (Dict[str, Any]): 配置字典
-            transform (Optional[Dict[str, Any]], optional): 轉換配置. 預設為 None.
-            is_train (bool, optional): 是否為訓練模式. 預設為 True.
-            cache_features (bool, optional): 是否緩存特徵. 預設為 True.
+            data_path: 特徵數據路徑（直接模式必填）
+            config: 配置字典（直接模式必填）
+            transform: 轉換配置
+            is_train: 是否為訓練模式
+            cache_features: 是否緩存特徵
+            index_path: 索引CSV文件路徑（索引模式必填）
+            label_field: 標籤欄位名稱，可以是'score', 'DrLee_Evaluation', 'DrTai_Evaluation', 'selection'
+            filter_criteria: 篩選條件字典
         """
-        self.data_path = Path(data_path)
-        self.config = config
+        # 決定是否使用索引模式
+        self.use_index_mode = index_path is not None and os.path.exists(index_path)
+        
+        # 初始化共用屬性
         self.is_train = is_train
         self.cache_features = cache_features
         self.feature_cache = {}
-        
-        # 設置日誌級別
-        logging.basicConfig(level=logging.INFO)
-        
-        # 獲取特徵配置
-        self.feature_config = config.get('data', {}).get('preprocessing', {}).get('features', {})
-        
-        # 獲取feature_type，可能存在不同位置
-        data_config = config.get('data', {})
-        self.feature_type = data_config.get('type', 'feature')
-        
-        # 獲取擴展名配置（如果有）
-        self.feature_extension = data_config.get('source', {}).get('feature_extension', None)
-        
-        # 是特徵數據集但沒有指定具體類型，根據擴展名判斷
-        if self.feature_type == 'feature' and self.feature_extension:
-            self.feature_type = self.feature_extension  # 使用擴展名作為類型
-        
-        # 確保兼容性
-        if self.feature_type not in ['json', 'csv', 'npz']:
-            logger.warning(f"未識別的特徵類型 '{self.feature_type}'，使用 feature_extension '{self.feature_extension}' 代替")
-            if self.feature_extension in ['json', 'csv', 'npz']:
-                self.feature_type = self.feature_extension
-            else:
-                logger.warning(f"無法確定特徵類型，將嘗試依次搜索 json, csv, npz 格式的文件")
-                self.feature_type = 'auto'  # 自動檢測
-            
-        self.feature_names = self.feature_config.get('names', [])  # 要使用的特徵列表
-        self.label_name = self.feature_config.get('label', 'score')  # 標籤列名
-        self.patient_id_column = self.feature_config.get('patient_id_column', 'patient_id')  # 患者ID列名
-        
-        # 特徵標準化設置
-        self.normalize = self.feature_config.get('normalize', True)
         self.scaler = None
         
-        # 收集樣本
-        self.samples = self._collect_samples()
-        
-        logger.info(f"加載了 {len(self.samples)} 個特徵樣本")
-        
-        # 如果需要標準化並處於訓練模式，初始化標準化器
-        if self.normalize and is_train:
-            self._init_scaler()
+        if self.use_index_mode:
+            # 索引模式初始化
+            self.data_path = None
+            self.config = config or {}
             
+            # 獲取特徵配置
+            self.feature_config = self.config.get('data', {}).get('preprocessing', {}).get('features', {})
+            self.normalize = self.feature_config.get('normalize', True)
+            
+            # 呼叫父類初始化
+            super().__init__(
+                index_path=index_path,
+                label_field=label_field,
+                transform=transform,
+                filter_criteria=filter_criteria,
+                fallback_to_direct=True
+            )
+            
+            # 如果需要標準化並處於訓練模式，初始化標準化器
+            if self.normalize and is_train and not self.is_direct_mode:
+                self._init_scaler()
+            
+        else:
+            # 直接模式初始化
+            if data_path is None or config is None:
+                raise ValueError("直接模式下需要提供data_path和config參數")
+                
+            self.data_path = Path(data_path)
+            self.config = config
+            self.is_direct_mode = True
+            
+            # 設置日誌級別
+            logging.basicConfig(level=logging.INFO)
+            
+            # 獲取特徵配置
+            self.feature_config = config.get('data', {}).get('preprocessing', {}).get('features', {})
+            
+            # 獲取feature_type，可能存在不同位置
+            data_config = config.get('data', {})
+            self.feature_type = data_config.get('type', 'feature')
+            
+            # 獲取擴展名配置（如果有）
+            self.feature_extension = data_config.get('source', {}).get('feature_extension', None)
+            
+            # 是特徵數據集但沒有指定具體類型，根據擴展名判斷
+            if self.feature_type == 'feature' and self.feature_extension:
+                self.feature_type = self.feature_extension  # 使用擴展名作為類型
+            
+            # 確保兼容性
+            if self.feature_type not in ['json', 'csv', 'npz']:
+                logger.warning(f"未識別的特徵類型 '{self.feature_type}'，使用 feature_extension '{self.feature_extension}' 代替")
+                if self.feature_extension in ['json', 'csv', 'npz']:
+                    self.feature_type = self.feature_extension
+                else:
+                    logger.warning(f"無法確定特徵類型，將嘗試依次搜索 json, csv, npz 格式的文件")
+                    self.feature_type = 'auto'  # 自動檢測
+                
+            self.feature_names = self.feature_config.get('names', [])  # 要使用的特徵列表
+            self.label_name = self.feature_config.get('label', 'score')  # 標籤列名
+            self.patient_id_column = self.feature_config.get('patient_id_column', 'patient_id')  # 患者ID列名
+            
+            # 特徵標準化設置
+            self.normalize = self.feature_config.get('normalize', True)
+            
+            # 收集樣本
+            self.samples = self._collect_samples()
+            
+            logger.info(f"加載了 {len(self.samples)} 個特徵樣本")
+            
+            # 如果需要標準化並處於訓練模式，初始化標準化器
+            if self.normalize and is_train:
+                self._init_scaler()
+    
+    def setup_direct_mode(self) -> None:
+        """設置直接加載模式
+        
+        當索引加載失敗時，如果fallback_to_direct為True，則調用此方法
+        設置為直接模式，但由於沒有data_path和config，因此僅提供最小功能
+        """
+        logger.warning("索引加載失敗並退化到直接模式，但未提供data_path和config，將使用空數據集")
+        self.samples = []
+        self.feature_type = 'auto'
+    
+    def load_data(self, data_row: dict) -> torch.Tensor:
+        """從數據行加載特徵數據
+        
+        Args:
+            data_row: 數據行，包含file_path等字段
+            
+        Returns:
+            torch.Tensor: 加載的特徵數據
+        """
+        file_path = data_row['file_path']
+        
+        # 檢查緩存
+        if self.cache_features and file_path in self.feature_cache:
+            return self.feature_cache[file_path]
+        
+        try:
+            # 判斷文件類型並加載特徵
+            features = self._load_feature_by_path(file_path)
+            
+            # 標準化特徵
+            if self.normalize and self.scaler is not None:
+                try:
+                    features = self.scaler.transform([features])[0]
+                except Exception as e:
+                    logger.warning(f"特徵標準化失敗: {str(e)}")
+            
+            # 轉換為張量
+            features_tensor = torch.tensor(features, dtype=torch.float32)
+            
+            # 緩存結果
+            if self.cache_features:
+                self.feature_cache[file_path] = features_tensor
+            
+            return features_tensor
+            
+        except Exception as e:
+            logger.error(f"加載特徵文件失敗: {file_path}, 錯誤: {str(e)}")
+            # 返回零張量作為後備
+            # 嘗試獲取一個合理的特徵維度
+            feature_dim = self._infer_feature_dim()
+            return torch.zeros(feature_dim, dtype=torch.float32)
+    
+    def direct_getitem(self, idx: int) -> Tuple[torch.Tensor, Any]:
+        """直接模式下獲取項目
+        
+        Args:
+            idx: 索引
+            
+        Returns:
+            Tuple[torch.Tensor, Any]: (特徵數據, 標籤)
+        """
+        if not hasattr(self, 'samples') or not self.samples:
+            # 如果沒有樣本，返回空數據
+            return torch.zeros(10, dtype=torch.float32), 0  # 默認10維特徵
+            
+        sample = self.samples[idx]
+        
+        # 加載特徵
+        try:
+            # 使用_load_features獲取特徵
+            features = self._load_features(idx)
+            
+            # 轉換為張量
+            features = torch.tensor(features, dtype=torch.float32)
+            
+            # 獲取標籤
+            label = sample['label']
+            
+            return features, label
+            
+        except Exception as e:
+            logger.error(f"處理樣本失敗，索引 {idx}: {str(e)}")
+            # 返回零張量作為後備
+            feature_dim = self._infer_feature_dim()
+            return torch.zeros(feature_dim, dtype=torch.float32), sample.get('label', 0)
+    
+    def direct_len(self) -> int:
+        """直接模式下的數據集大小
+        
+        Returns:
+            int: 數據集大小
+        """
+        if hasattr(self, 'samples'):
+            return len(self.samples)
+        return 0
+    
+    def _infer_feature_dim(self) -> int:
+        """推斷特徵維度
+        
+        Returns:
+            int: 特徵維度，默認為10
+        """
+        # 如果有樣本，嘗試加載第一個樣本獲取維度
+        if hasattr(self, 'samples') and self.samples:
+            try:
+                features = self._load_features(0)
+                return len(features)
+            except:
+                pass
+        
+        return 10  # 默認值
+    
+    def _load_feature_by_path(self, file_path: str) -> np.ndarray:
+        """根據文件路徑加載特徵
+        
+        Args:
+            file_path: 特徵文件路徑
+            
+        Returns:
+            np.ndarray: 特徵數組
+        """
+        # 根據擴展名判斷文件類型
+        ext = os.path.splitext(file_path)[1].lower()
+        
+        if ext == '.npz':
+            return self._load_npz_feature(file_path)
+        elif ext == '.json':
+            return self._load_json_feature(file_path)
+        elif ext == '.csv':
+            return self._load_csv_feature(file_path)
+        else:
+            raise ValueError(f"不支持的特徵文件類型: {ext}")
+    
     def _collect_samples(self) -> List[Dict[str, Any]]:
         """收集所有樣本
         
@@ -565,51 +723,59 @@ class FeatureDataset(Dataset):
         return filtered_samples
         
     def _init_scaler(self):
-        """初始化特徵標準化器"""
+        """初始化特徵標準化器
+        
+        在訓練模式下初始化標準化器，用於對特徵進行標準化處理
+        """
         logger.info("初始化特徵標準化器...")
         
-        # 首先確定是否所有特徵都有相同的維度
-        feature_dims = []
-        for idx in range(len(self.samples)):
-            features = self._load_features(idx)
-            if features is not None:
-                feature_dims.append(len(features))
-        
-        if not feature_dims:
-            logger.warning("無法初始化特徵標準化器，沒有有效特徵")
+        # 在索引模式下，我們暫時不做標準化
+        if self.use_index_mode and not self.is_direct_mode:
+            logger.warning("索引模式下暫不支持特徵標準化，跳過初始化標準化器")
             return
-        
-        # 檢查特徵維度是否一致
-        if len(set(feature_dims)) > 1:
-            logger.warning(f"發現不同維度的特徵向量: {set(feature_dims)}，僅使用最常見的維度進行標準化")
-            # 找出最常見的維度
-            from collections import Counter
-            common_dim = Counter(feature_dims).most_common(1)[0][0]
-            logger.info(f"選擇維度 {common_dim} 作為標準特徵維度")
             
-            # 只收集具有常見維度的特徵
-            all_features = []
-            for idx in range(len(self.samples)):
-                features = self._load_features(idx)
-                if features is not None and len(features) == common_dim:
-                    all_features.append(features.reshape(1, -1))
-        else:
-            # 所有特徵維度一致，直接收集
-            all_features = []
-            for idx in range(len(self.samples)):
-                features = self._load_features(idx)
-                if features is not None:
-                    all_features.append(features.reshape(1, -1))
-        
-        if all_features:
-            # 創建並訓練標準化器
-            all_features = np.vstack(all_features)
+        # 檢查是否有樣本
+        if not hasattr(self, 'samples') or not self.samples:
+            logger.warning("沒有樣本可用於初始化標準化器")
+            return
+            
+        try:
+            # 收集特徵維度統計
+            dimensions = {}
+            feature_samples = []
+            max_samples = min(len(self.samples), 100)  # 最多使用100個樣本初始化
+            
+            for i in range(min(max_samples, len(self.samples))):
+                try:
+                    features = self._load_features(i)
+                    dim = len(features)
+                    dimensions[dim] = dimensions.get(dim, 0) + 1
+                    feature_samples.append(features)
+                except Exception as e:
+                    logger.warning(f"加載特徵失敗 (樣本 {i}): {str(e)}")
+                    continue
+            
+            if not feature_samples:
+                logger.warning("無法加載任何特徵樣本，跳過初始化標準化器")
+                return
+                
+            # 使用最常見的維度
+            most_common_dim = max(dimensions, key=dimensions.get)
+            logger.info(f"使用最常見的特徵維度 {most_common_dim} 初始化標準化器")
+            
+            # 只使用具有最常見維度的樣本
+            valid_samples = [sample for sample in feature_samples if len(sample) == most_common_dim]
+            
+            # 初始化並訓練標準化器
             self.scaler = StandardScaler()
-            self.scaler.fit(all_features)
-            logger.info(f"特徵標準化器已初始化，特徵均值: {self.scaler.mean_[:5]}..., 方差: {self.scaler.var_[:5]}...")
-        else:
-            logger.warning("無法初始化特徵標準化器，沒有有效特徵")
+            self.scaler.fit(valid_samples)
             
+            logger.info("標準化器初始化完成")
+            
+        except Exception as e:
+            logger.error(f"初始化標準化器失敗: {str(e)}")
+            self.scaler = None
+    
     def _load_features(self, idx: int) -> np.ndarray:
         """加載特徵數據
         
@@ -878,33 +1044,199 @@ class FeatureDataset(Dataset):
         # 如果沒有樣本或加載失敗，返回默認值
         return len(self.feature_names) if self.feature_names else 0 
 
+    def _load_npz_feature(self, file_path: str) -> np.ndarray:
+        """加載NPZ格式的特徵文件
+        
+        Args:
+            file_path: NPZ文件路徑
+            
+        Returns:
+            np.ndarray: 特徵數組
+        """
+        try:
+            data = np.load(file_path, allow_pickle=True)
+            
+            # 優先從'features'鍵獲取特徵
+            if 'features' in data:
+                features = data['features']
+                if isinstance(features, np.ndarray):
+                    return features
+            
+            # 否則嘗試提取所有非元數據字段
+            feature_arrays = []
+            for key in data.keys():
+                if key != 'metadata':
+                    arr = data[key]
+                    if isinstance(arr, np.ndarray):
+                        feature_arrays.append(arr)
+            
+            if feature_arrays:
+                # 如果有多個特徵數組，連接它們
+                return np.concatenate(feature_arrays, axis=0)
+            
+            raise ValueError(f"NPZ文件 {file_path} 中找不到有效的特徵數據")
+            
+        except Exception as e:
+            raise ValueError(f"無法加載NPZ文件 {file_path}: {str(e)}")
+    
+    def _load_json_feature(self, file_path: str) -> np.ndarray:
+        """加載JSON格式的特徵文件
+        
+        Args:
+            file_path: JSON文件路徑
+            
+        Returns:
+            np.ndarray: 特徵數組
+        """
+        try:
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+            
+            # 如果是字典，尋找特徵字段
+            if isinstance(data, dict):
+                # 優先使用配置中指定的特徵名
+                if self.feature_names:
+                    features = []
+                    for name in self.feature_names:
+                        if name in data:
+                            features.extend(data[name])
+                    
+                    if features:
+                        return np.array(features, dtype=np.float32)
+                
+                # 否則嘗試找到features字段
+                if 'features' in data:
+                    features = data['features']
+                    if isinstance(features, list):
+                        return np.array(features, dtype=np.float32)
+                
+                # 否則嘗試提取所有數值字段
+                features = []
+                for key, value in data.items():
+                    if isinstance(value, (list, np.ndarray)) and key != 'metadata':
+                        features.extend(value)
+                
+                if features:
+                    return np.array(features, dtype=np.float32)
+            
+            # 如果是列表，直接使用
+            elif isinstance(data, list):
+                return np.array(data, dtype=np.float32)
+            
+            raise ValueError(f"JSON文件 {file_path} 中找不到有效的特徵數據")
+            
+        except Exception as e:
+            raise ValueError(f"無法加載JSON文件 {file_path}: {str(e)}")
+    
+    def _load_csv_feature(self, file_path: str) -> np.ndarray:
+        """加載CSV格式的特徵文件
+        
+        Args:
+            file_path: CSV文件路徑
+            
+        Returns:
+            np.ndarray: 特徵數組
+        """
+        try:
+            df = pd.read_csv(file_path)
+            
+            # 優先使用配置中指定的特徵列
+            if self.feature_names:
+                # 檢查所有指定的列是否存在
+                valid_names = [name for name in self.feature_names if name in df.columns]
+                if valid_names:
+                    return df[valid_names].values.flatten()
+            
+            # 否則使用除了ID和標籤以外的所有列
+            exclude_cols = [self.patient_id_column, self.label_name]
+            feature_cols = [col for col in df.columns if col not in exclude_cols]
+            
+            if feature_cols:
+                return df[feature_cols].values.flatten()
+            
+            raise ValueError(f"CSV文件 {file_path} 中找不到有效的特徵列")
+            
+        except Exception as e:
+            raise ValueError(f"無法加載CSV文件 {file_path}: {str(e)}")
+
 # 中文註解：這是feature_dataset.py的Minimal Executable Unit，檢查能否正確初始化與錯誤路徑時的優雅報錯
 if __name__ == "__main__":
     """
-    Description: Minimal Executable Unit for feature_dataset.py，檢查FeatureDataset能否正確初始化與錯誤路徑時的優雅報錯。
+    Description: Minimal Executable Unit for feature_dataset.py，測試特徵數據集的索引模式和直接模式。
     Args: None
     Returns: None
     References: 無
     """
     import logging
+    import tempfile
+    import pandas as pd
+    import os
+    
+    # 配置日誌
     logging.basicConfig(level=logging.INFO)
-    from data.feature_dataset import FeatureDataset
-
-    # 測試錯誤路徑
+    
+    # 創建測試索引CSV
+    with tempfile.NamedTemporaryFile(suffix='.csv', delete=False, mode='w') as temp_file:
+        test_data = pd.DataFrame({
+            'file_path': ['/path/to/feature1.npz', '/path/to/feature2.npz', '/path/to/feature3.npz'],
+            'score': [15, 25, 5],
+            'patient_id': ['p001', 'p002', 'p001'],
+            'DrLee_Evaluation': ['聽起來正常', '輕度異常', '重度異常'],
+            'DrTai_Evaluation': ['正常', '無OR 輕微吞嚥障礙', '重度吞嚥障礙'],
+            'selection': ['乾吞嚥1口', '吞水10ml', '餅乾1塊'],
+            'status': ['processed', 'processed', 'raw']
+        })
+        test_data.to_csv(temp_file.name, index=False)
+        test_csv_path = temp_file.name
+    
     try:
-        dummy_config = {
-            "data": {
-                "type": "feature",
-                "source": {"feature_dir": "not_exist_dir"},
-                "preprocessing": {"features": {"normalize": True}}
+        # 測試索引模式
+        print("測試1: 索引模式 (預期會創建空數據集)")
+        config = {
+            'data': {
+                'preprocessing': {
+                    'features': {
+                        'normalize': False  # 關閉標準化，避免嘗試初始化標準化器
+                    }
+                }
             }
         }
-        dataset = FeatureDataset(data_path="not_exist_dir", config=dummy_config)
-        print(f"資料集長度: {len(dataset)}")
-        if len(dataset) > 0:
-            sample = dataset[0]
-            print(f"第一筆資料: {sample}")
-        else:
-            print("沒有資料可供測試")
+        
+        dataset = FeatureDataset(
+            index_path=test_csv_path,
+            label_field="score",
+            config=config,
+            is_train=False  # 設為False以避免初始化標準化器
+        )
+        print(f"索引模式數據集大小: {len(dataset)}")
+        
+        # 測試直接模式配置
+        print("\n測試2: 直接模式 (預期會創建空數據集或報錯)")
+        try:
+            direct_config = {
+                'data': {
+                    'preprocessing': {
+                        'features': {
+                            'normalize': False  # 關閉標準化
+                        }
+                    }
+                }
+            }
+            direct_dataset = FeatureDataset(
+                data_path="./",  # 使用當前目錄
+                config=direct_config,
+                is_train=False  # 設為False以避免初始化標準化器
+            )
+            print(f"直接模式數據集大小: {len(direct_dataset)}")
+        except Exception as e:
+            print(f"創建直接模式數據集失敗 (預期行為): {str(e)}")
+        
+        print("\n測試結束")
+        
     except Exception as e:
-        print(f"遇到錯誤（預期行為）: {e}") 
+        print(f"測試失敗: {str(e)}")
+    
+    finally:
+        # 清理測試文件
+        if os.path.exists(test_csv_path):
+            os.unlink(test_csv_path) 

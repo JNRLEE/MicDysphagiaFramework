@@ -182,13 +182,31 @@ class PyTorchTrainer:
             self.writer.add_scalar('Loss/val', val_loss, epoch)
             # 記錄學習率
             current_lr = self.optimizer.param_groups[0]['lr']
-            self.writer.add_scalar('LearningRate', current_lr, epoch)
+            self.writer.add_scalar('Learning_rate', current_lr, epoch)
             # 記錄訓練指標
             for metric_name, metric_value in train_metrics.items():
-                self.writer.add_scalar(f'Metrics/train/{metric_name}', metric_value, epoch)
+                # 僅當指標值是標量時才記錄到 TensorBoard
+                if not isinstance(metric_value, torch.Tensor) or metric_value.numel() == 1:
+                    # 確保值是標量
+                    if isinstance(metric_value, torch.Tensor):
+                        metric_value = metric_value.item()
+                    self.writer.add_scalar(f'Metrics/train/{metric_name}', metric_value, epoch)
+                else:
+                    logger.warning(f"跳過記錄非標量指標 '{metric_name}' 到 TensorBoard (形狀: {metric_value.shape if isinstance(metric_value, torch.Tensor) else type(metric_value)})")
+            
             # 記錄驗證指標
             for metric_name, metric_value in val_metrics.items():
-                self.writer.add_scalar(f'Metrics/val/{metric_name}', metric_value, epoch)
+                # 僅當指標值是標量時才記錄到 TensorBoard，並跳過我們添加的特殊鍵
+                if metric_name not in ['outputs', 'targets', 'predictions'] and (not isinstance(metric_value, torch.Tensor) or metric_value.numel() == 1):
+                    # 確保值是標量
+                    if isinstance(metric_value, torch.Tensor):
+                        metric_value = metric_value.item()
+                    self.writer.add_scalar(f'Metrics/val/{metric_name}', metric_value, epoch)
+                elif metric_name in ['outputs', 'targets', 'predictions']:
+                    # 這些鍵是為了 Hook 添加的，不需要寫入 TensorBoard
+                    pass
+                else:
+                    logger.warning(f"跳過記錄非標量指標 '{metric_name}' 到 TensorBoard (形狀: {metric_value.shape if isinstance(metric_value, torch.Tensor) else type(metric_value)})")
             # ------------------------
             
             # 更新指標記錄 (用於最終返回的 history)
@@ -308,7 +326,25 @@ class PyTorchTrainer:
         # 添加指標
         for metric_type in ['train', 'val']:
             for metric_name, values in self.metrics[metric_type].items():
-                history_dict[f'{metric_type}_{metric_name}'] = [float(val) for val in values]
+                # 跳過我們添加的非標量指標
+                if metric_name in ['outputs', 'targets', 'predictions']:
+                    continue
+                
+                # 嘗試將指標值轉換為標量
+                try:
+                    history_dict[f'{metric_type}_{metric_name}'] = []
+                    for val in values:
+                        if isinstance(val, torch.Tensor):
+                            if val.numel() == 1:  # 只有單元素張量才能轉換為標量
+                                history_dict[f'{metric_type}_{metric_name}'].append(float(val.item()))
+                            else:
+                                # 對於多元素張量，使用平均值作為標量表示
+                                logger.warning(f"指標 '{metric_name}' 是多元素張量，使用平均值作為標量表示")
+                                history_dict[f'{metric_type}_{metric_name}'].append(float(val.mean().item()))
+                        else:
+                            history_dict[f'{metric_type}_{metric_name}'].append(float(val))
+                except Exception as e:
+                    logger.warning(f"添加指標 '{metric_name}' 到訓練歷史時出錯: {e}, 值類型: {type(values[0] if values else None)}")
         
         # 保存訓練歷史到文件
         history_path = os.path.join(self.output_dir, 'training_history.json')
@@ -569,7 +605,7 @@ class PyTorchTrainer:
                 combined_targets = torch.cat(all_targets, dim=0)
                 combined_predictions = torch.cat(all_predictions, dim=0)
                 
-                # 計算指標 (傳遞的是已處理的 predictions 和包含 'targets' 鍵的字典)
+                # 計算指標 (修改這裡，傳遞包含 'targets' 的字典)
                 metrics = self._compute_metrics(combined_predictions, {'targets': combined_targets})
                 
                 # 如果是測試模式，保存預測結果和真實值
@@ -587,6 +623,11 @@ class PyTorchTrainer:
                             self.test_predictions['inputs'] = combined_inputs
                         except Exception as e:
                             logger.warning(f"合併測試輸入數據時出錯: {str(e)}")
+                else:
+                    # 為了在 epoch 結束回調中使用，將驗證集預測結果添加到指標字典中
+                    metrics['outputs'] = combined_outputs
+                    metrics['targets'] = combined_targets
+                    metrics['predictions'] = combined_predictions
             except Exception as e:
                 logger.warning(f"計算{phase.lower()}指標時出錯: {str(e)}")
         else:
@@ -835,8 +876,12 @@ class PyTorchTrainer:
                     if targets is None:
                         targets = batch.get('target', None) # 添加對 'target' 的檢查
                         if targets is None:
-                             logger.warning("在指標計算中找不到 'label', 'score' 或 'target' 鍵，跳過指標計算。")
-                             return {} # 返回空字典
+                            # 嘗試獲取 'targets' 鍵 (這可能是在評估階段由 _validate_epoch 傳遞的)
+                            targets = batch.get('targets', None)
+                            if targets is None:
+                                logger.warning("在指標計算中找不到 'label', 'score', 'target' 或 'targets' 鍵，跳過指標計算。")
+                                logger.debug(f"可用的鍵: {list(batch.keys() if isinstance(batch, dict) else [])}")
+                                return {} # 返回空字典
             else:
                 # 假設 batch 是 (input, target) 形式的元組
                 if len(batch) >= 2:

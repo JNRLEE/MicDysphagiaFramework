@@ -10,7 +10,9 @@ global:
 data:
   type: 'feature'
   source:
-    feature_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
+    feature_dir: '/home/sbplab/JNRLEE/MicDysphagiaFramework/data/Processed(Cut)'
+    # 原始路徑（保留為參考）
+    # feature_dir: '/Users/jnrle/Library/CloudStorage/GoogleDrive-jenner.lee.com@gmail.com/My Drive/MicforDysphagia/ProjectDeveloper/MicDysphagiaFramework/tests/dataloader_test/dataset_test'
     feature_extension: 'npz'
   preprocessing:
     features:
