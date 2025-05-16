@@ -1142,6 +1142,24 @@ class ActivationCaptureHook(CallbackInterface):
             hook.remove()
         self.hooks = []
         
+        # 修改：將特徵向量處理邏輯提取到單獨的方法中
+        self._process_features(self.current_epoch)
+    
+    def _process_features(self, epoch: int) -> None:
+        """處理並保存特徵向量
+        
+        Args:
+            epoch: 要處理的epoch
+            
+        Returns:
+            None
+            
+        Description:
+            處理並保存指定epoch的特徵向量
+            
+        References:
+            無
+        """
         # 為每一層保存激活值
         for layer_name, activations in self.all_activations.items():
             if not activations:
@@ -1188,7 +1206,7 @@ class ActivationCaptureHook(CallbackInterface):
                     'layer_name': layer_name,
                     'activations': all_activations,
                     'timestamp': datetime.now().isoformat(),
-                    'epoch': self.current_epoch
+                    'epoch': epoch
                 }
                 
                 # 添加目標和樣本 ID（如果有）
@@ -1207,7 +1225,7 @@ class ActivationCaptureHook(CallbackInterface):
                 os.makedirs(feature_dir, exist_ok=True)
                 
                 # 創建epoch特定目錄
-                epoch_dir = os.path.join(feature_dir, f'epoch_{self.current_epoch}')
+                epoch_dir = os.path.join(feature_dir, f'epoch_{epoch}')
                 os.makedirs(epoch_dir, exist_ok=True)
                 
                 # 保存特徵向量
@@ -1236,7 +1254,7 @@ class ActivationCaptureHook(CallbackInterface):
                         logger.error(f"計算層 '{layer_name}' 的t-SNE座標時出錯: {e}")
                 
                 # 添加到特徵分析摘要
-                self._update_feature_analysis_summary(layer_name, all_activations, targets, self.current_epoch)
+                self._update_feature_analysis_summary(layer_name, all_activations, targets, epoch)
                 
             except Exception as e:
                 logger.error(f"保存層 '{layer_name}' 的激活值時出錯: {e}")
@@ -1244,8 +1262,8 @@ class ActivationCaptureHook(CallbackInterface):
                 logger.error(traceback.format_exc())
         
         # 標記這個epoch已經處理過，避免重複處理
-        self.captured_epochs.add(self.current_epoch)
-        logger.info(f"已完成epoch {self.current_epoch}的特徵向量保存")
+        self.captured_epochs.add(epoch)
+        logger.info(f"已完成epoch {epoch}的特徵向量保存")
     
     def _compute_cosine_similarity(self, features: torch.Tensor, targets: Optional[torch.Tensor] = None) -> Dict[str, Any]:
         """計算特徵向量間的餘弦相似度
