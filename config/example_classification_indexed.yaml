@@ -1,27 +1,27 @@
 # 使用索引CSV的分類任務示例配置
 # 此配置文件展示了如何使用索引CSV進行音頻分類任務
 # 主要特點：使用DrLee_Evaluation作為分類目標，按患者ID拆分數據
-
+# python scripts/run_experiments.py --config config/example_classification_indexed.yaml
 # 全局配置 - 設置實驗環境和輸出
 global:
   experiment_name: 'indexed_classification'  # 實驗名稱，用於日誌和輸出文件命名
   seed: 42                                   # 隨機種子，確保結果可重現
   debug: false                               # 是否啟用調試模式
   device: 'auto'                             # 訓練設備，'auto'會自動選擇GPU或CPU
-  output_dir: 'outputs'                      # 輸出目錄，存放模型、日誌和結果
+  output_dir: 'results'                      # 輸出目錄，存放模型、日誌和結果
   logging_level: 'INFO'                      # 日誌級別，可選'DEBUG', 'INFO', 'WARNING', 'ERROR'
 
 # 數據配置 - 定義數據加載和預處理方式
 data:
   type: 'audio'                              # 數據類型，可選'audio', 'spectrogram', 'feature'
   
-  # 索引CSV配置 - 啟用索引CSV支持，實現靈活的數據選擇和標籤映射
-  use_index: true                            # 啟用索引CSV功能
-  index_path: 'data/data_index.csv'          # 索引CSV文件路徑
-  label_field: 'DrLee_Evaluation'            # 使用DrLee_Evaluation作為標籤欄位（分類任務）
-  filter_criteria:                           # 數據篩選條件
-    status: 'processed'                      # 只使用處理過的數據
-    selection: null                          # 不篩選特定動作類型，使用所有動作類型
+  # 新增索引CSV支持
+  use_index: true  # 是否使用索引CSV加載數據
+  index_path: 'data/metadata/data_index.csv'  # 索引CSV文件路徑
+  label_field: 'DrLee_Evaluation'  # 標籤欄位名稱: 'score'(回歸任務), 'DrLee_Evaluation'(3類), 'DrTai_Evaluation'(4類), 'selection'(9類+)
+  filter_criteria:  # 篩選條件
+    status: null  # 數據處理狀態，'raw', 'processed', 'failed'，或null表示不篩選
+    selection: null  # 錄音時的動作類型，如'乾吞嚥1口'，或null表示不篩選
   
   # 音頻預處理 - 設置音頻處理參數
   preprocessing:
@@ -73,13 +73,13 @@ model:
   parameters:
     model_name: 'resnet18'                   # 具體的ResNet變體
     pretrained: true                         # 是否使用預訓練權重
-    num_classes: 3                           # 輸出類別數量（DrLee_Evaluation有3個類別）
-    input_channels: 1                        # 輸入通道數（單通道音頻）
+    num_classes: 3                           # 輸出類別數量（會根據選擇的標籤欄位自動設置）
+    input_channels: 3                        # 輸入通道數（對應轉換後的RGB頻譜圖）
     is_classification: true                  # 確認這是分類任務
 
 # 訓練配置 - 定義訓練過程和優化器
 training:
-  epochs: 100                                # 最大訓練輪數
+  epochs: 3  # Modified to 3 epochs for quick testing
   early_stopping:                            # 早停機制，防止過擬合
     enabled: true                            # 啟用早停
     patience: 10                             # 容忍輪數，驗證指標不再改善時等待的輪數
@@ -141,3 +141,26 @@ visualization:
     enabled: true                            # 啟用t-SNE
     perplexity: 30                           # t-SNE困惑度參數
     n_components: 2                          # 降維後的維度 
+
+# Hook配置 - 啟用各種模型分析和數據收集鉤子
+hooks:
+  # 模型分析鉤子：收集層激活值和梯度
+  model_analytics:
+    enabled: true
+    monitored_layers: ['backbone.0', 'backbone.4', 'backbone.5', 'backbone.6', 'backbone.7', 'head']  # 監控主要層
+    monitored_params: ['head.2.weight', 'head.2.bias']   # 監控分類頭的權重和偏置
+    save_frequency: 1  # 保存頻率（每 N 個 epoch 保存一次）
+    save_validation_predictions: true  # 是否在每個 epoch 保存驗證集預測結果
+  
+  # 評估結果捕獲鉤子：收集測試集的真實標籤和模型預測（用於混淆矩陣）
+  evaluation_capture:
+    enabled: true
+    datasets: ['test', 'val']  # 要捕獲結果的數據集
+    save_probabilities: true  # 是否保存類別概率（用於 ROC 曲線）
+  
+  # 激活值捕獲鉤子：收集特定層的激活值（用於餘弦相似度圖）
+  activation_capture:
+    enabled: true
+    target_layers: ['backbone.4', 'backbone.7', 'head.0']  # 捕獲關鍵層的激活值
+    datasets: ['test']  # 在哪些數據集上捕獲
+    include_sample_ids: true  # 是否包含樣本ID 

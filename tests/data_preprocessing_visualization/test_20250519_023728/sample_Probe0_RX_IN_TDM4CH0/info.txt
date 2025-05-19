@@ -1,0 +1,5 @@
+音頻文件: /home/sbplab/JNRLEE/MicDysphagiaFramework/data/Processed(Cut)/P074_餅乾2塊_2025-02-27_10-31-10/Probe0_RX_IN_TDM4CH0.wav
+類別: 重度異常
+患者ID: P074
+序號: 418e723c-1f6a-4b00-999f-23384eca7676
+選擇: 餅乾2塊

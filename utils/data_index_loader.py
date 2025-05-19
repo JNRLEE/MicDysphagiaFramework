@@ -217,7 +217,7 @@ class DataIndexLoader:
     
     def split_by_patient(self, train_ratio: float = 0.7, val_ratio: float = 0.15, 
                         test_ratio: float = 0.15, seed: int = 42) -> tuple:
-        """按照患者ID拆分數據為訓練、驗證和測試集
+        """按照患者ID拆分數據為訓練、驗證和測試集，確保N開頭和P開頭的患者ID在各集合中均勻分佈
         
         Args:
             train_ratio: 訓練集比例
@@ -232,22 +232,56 @@ class DataIndexLoader:
             logger.warning("數據索引中不存在patient_id欄位，無法按患者ID拆分")
             return None, None, None
         
-        import numpy as np
-        np.random.seed(seed)
+        import random
+        random.seed(seed)
         
         # 獲取唯一的患者ID
         patient_ids = self.index_df['patient_id'].unique()
-        np.random.shuffle(patient_ids)
         
-        # 計算每個集合的患者數量
-        n_patients = len(patient_ids)
-        n_train = int(n_patients * train_ratio)
-        n_val = int(n_patients * val_ratio)
+        # 分別處理N開頭和P開頭的患者ID
+        n_prefixed_patients = [pid for pid in patient_ids if pid.startswith('N')]
+        p_prefixed_patients = [pid for pid in patient_ids if pid.startswith('P')]
+        other_patients = [pid for pid in patient_ids if not (pid.startswith('N') or pid.startswith('P'))]
         
-        # 拆分患者ID
-        train_patients = patient_ids[:n_train]
-        val_patients = patient_ids[n_train:n_train+n_val]
-        test_patients = patient_ids[n_train+n_val:]
+        # 打亂各組患者ID
+        random.shuffle(n_prefixed_patients)
+        random.shuffle(p_prefixed_patients)
+        random.shuffle(other_patients)
+        
+        logger.info(f"患者ID分佈: N開頭 {len(n_prefixed_patients)} 位, P開頭 {len(p_prefixed_patients)} 位, 其他 {len(other_patients)} 位")
+        
+        # 為每組計算分割點
+        n_train_size = int(len(n_prefixed_patients) * train_ratio)
+        n_val_size = int(len(n_prefixed_patients) * val_ratio)
+        
+        p_train_size = int(len(p_prefixed_patients) * train_ratio)
+        p_val_size = int(len(p_prefixed_patients) * val_ratio)
+        
+        other_train_size = int(len(other_patients) * train_ratio)
+        other_val_size = int(len(other_patients) * val_ratio)
+        
+        # 分割各組患者ID
+        n_train = n_prefixed_patients[:n_train_size]
+        n_val = n_prefixed_patients[n_train_size:n_train_size+n_val_size]
+        n_test = n_prefixed_patients[n_train_size+n_val_size:]
+        
+        p_train = p_prefixed_patients[:p_train_size]
+        p_val = p_prefixed_patients[p_train_size:p_train_size+p_val_size]
+        p_test = p_prefixed_patients[p_train_size+p_val_size:]
+        
+        other_train = other_patients[:other_train_size]
+        other_val = other_patients[other_train_size:other_train_size+other_val_size]
+        other_test = other_patients[other_train_size+other_val_size:]
+        
+        # 合併各組患者ID
+        train_patients = n_train + p_train + other_train
+        val_patients = n_val + p_val + other_val
+        test_patients = n_test + p_test + other_test
+        
+        # 記錄各集合的患者ID分佈
+        logger.info(f"訓練集患者ID分佈: N開頭 {len(n_train)} 位, P開頭 {len(p_train)} 位, 其他 {len(other_train)} 位")
+        logger.info(f"驗證集患者ID分佈: N開頭 {len(n_val)} 位, P開頭 {len(p_val)} 位, 其他 {len(other_val)} 位")
+        logger.info(f"測試集患者ID分佈: N開頭 {len(n_test)} 位, P開頭 {len(p_test)} 位, 其他 {len(other_test)} 位")
         
         # 獲取每個集合的文件索引
         train_indices = self.index_df[self.index_df['patient_id'].isin(train_patients)].index.tolist()

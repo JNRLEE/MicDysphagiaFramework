@@ -1,0 +1,5 @@
+音頻文件: /home/sbplab/JNRLEE/MicDysphagiaFramework/data/Processed(Cut)/P030_餅乾1塊_2024-12-16_10-41-54/Probe0_RX_IN_TDM4CH0.wav
+類別: 重度異常
+患者ID: P030
+序號: 1e6f5b31-05eb-4f5c-82aa-e858c952c3f2
+選擇: 餅乾1塊

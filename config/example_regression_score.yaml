@@ -1,0 +1,165 @@
+# 使用索引CSV的回歸任務示例配置 - score版本
+# 此配置文件展示了如何使用索引CSV進行音頻回歸任務
+# 主要特點：使用score作為回歸目標，按患者ID拆分數據
+# python scripts/run_experiments.py --config config/example_regression_score.yaml
+# 全局配置 - 設置實驗環境和輸出
+global:
+  experiment_name: 'indexed_regression_score'  # 實驗名稱，用於日誌和輸出文件命名
+  seed: 42                                   # 隨機種子，確保結果可重現
+  debug: false                               # 是否啟用調試模式
+  device: 'auto'                             # 訓練設備，'auto'會自動選擇GPU或CPU
+  output_dir: 'results'                      # 輸出目錄，存放模型、日誌和結果
+  logging_level: 'INFO'                      # 日誌級別，可選'DEBUG', 'INFO', 'WARNING', 'ERROR'
+
+# 數據配置 - 定義數據加載和預處理方式
+data:
+  type: 'audio'                              # 數據類型，可選'audio', 'spectrogram', 'feature'
+  
+  # 新增索引CSV支持
+  use_index: true  # 是否使用索引CSV加載數據
+  index_path: 'data/metadata/data_index.csv'  # 索引CSV文件路徑
+  label_field: 'score'  # 標籤欄位名稱: 'score'(回歸任務), 'DrLee_Evaluation'(3類), 'DrTai_Evaluation'(4類), 'selection'(9類+)
+  filter_criteria:  # 篩選條件
+    status: null  # 數據處理狀態，'raw', 'processed', 'failed'，或null表示不篩選
+    selection: null  # 錄音時的動作類型，如'乾吞嚥1口'，或null表示不篩選
+  
+  # 音頻預處理 - 設置音頻處理參數
+  preprocessing:
+    audio:
+      sample_rate: 16000                     # 採樣率（Hz）
+      duration: 5.0                          # 音頻長度（秒）
+      normalize: true                        # 是否標準化音頻振幅
+  
+  # 特徵提取 - 從音頻生成特徵
+  preprocessing:
+    features:
+      method: 'mel_spectrogram'              # 特徵提取方法，使用梅爾頻譜圖
+      n_mels: 128                            # 梅爾濾波器數量
+      n_fft: 1024                            # FFT窗口大小
+      hop_length: 512                        # 幀移步長
+      log_mel: true                          # 是否對梅爾頻譜圖取對數
+  
+  # 數據集拆分 - 定義訓練、驗證和測試集的劃分方式
+  splits:
+    train_ratio: 0.7                         # 訓練集比例
+    val_ratio: 0.15                          # 驗證集比例
+    test_ratio: 0.15                         # 測試集比例
+    split_seed: 42                           # 拆分隨機種子
+    split_by_patient: true                   # 按患者ID拆分，確保同一患者的數據不會同時出現在訓練和測試集
+  
+  # 數據轉換 - 數據增強和預處理
+  transforms:
+    train:                                   # 訓練集數據增強
+      time_shift:                            # 時間偏移增強
+        enabled: true                        # 啟用時間偏移
+        max_shift_sec: 0.5                   # 最大偏移時間（秒）
+      volume_scale:                          # 音量縮放增強
+        enabled: true                        # 啟用音量縮放
+        min_scale: 0.8                       # 最小縮放因子
+        max_scale: 1.2                       # 最大縮放因子
+    val: {}                                  # 驗證集不使用數據增強
+    test: {}                                 # 測試集不使用數據增強
+  
+  # 數據加載器配置 - 設置批處理和並行加載
+  dataloader:
+    batch_size: 32                           # 批大小
+    num_workers: 4                           # 數據加載線程數
+    pin_memory: true                         # 是否將數據固定在內存中（GPU訓練時有用）
+    drop_last: false                         # 是否丟棄最後一個不完整批次
+
+# 模型配置 - 定義模型架構和參數
+model:
+  type: 'resnet'                             # 模型類型，使用ResNet
+  parameters:
+    model_name: 'resnet18'                   # 具體的ResNet變體
+    pretrained: true                         # 是否使用預訓練權重
+    num_classes: 1                           # 輸出類別數量（回歸任務為1）
+    input_channels: 3                        # 輸入通道數（對應轉換後的RGB頻譜圖）
+    is_classification: false                 # 確認這是回歸任務
+
+# 訓練配置 - 定義訓練過程和優化器
+training:
+  epochs: 3  # 設置為3個epoch進行快速測試
+  early_stopping:                            # 早停機制，防止過擬合
+    enabled: true                            # 啟用早停
+    patience: 10                             # 容忍輪數，驗證指標不再改善時等待的輪數
+    min_delta: 0.001                         # 最小改善閾值
+  
+  optimizer:                                 # 優化器配置
+    type: 'Adam'                             # 使用Adam優化器
+    parameters:
+      lr: 0.001                              # 學習率
+      weight_decay: 0.0001                   # 權重衰減（L2正則化）
+  
+  lr_scheduler:                              # 學習率調度器
+    type: 'ReduceLROnPlateau'                # 根據驗證指標調整學習率
+    parameters:
+      mode: 'min'                            # 監控模式，'min'表示指標越小越好
+      factor: 0.5                            # 學習率衰減因子
+      patience: 5                            # 容忍輪數
+      min_lr: 1.0e-6                         # 最小學習率
+  
+  loss:                                      # 損失函數配置
+    type: 'MSELoss'                          # 使用均方誤差損失（適用於回歸任務）
+    parameters:
+      reduction: 'mean'                      # 損失縮減方式
+  
+  gradient_clipping:                         # 梯度裁剪，防止梯度爆炸
+    enabled: true                            # 啟用梯度裁剪
+    max_norm: 1.0                            # 最大梯度範數
+
+# 評估配置 - 定義模型評估方式
+evaluation:
+  metrics:                                   # 評估指標
+    - 'mse'                                  # 均方誤差
+    - 'rmse'                                 # 均方根誤差
+    - 'mae'                                  # 平均絕對誤差
+    - 'r2'                                   # R平方
+  
+  validation:                                # 驗證配置
+    frequency: 1                             # 每訓練多少輪進行一次驗證
+    best_model_metric: 'mse'                 # 用於保存最佳模型的指標
+    best_model_mode: 'min'                   # 指標模式，'min'表示越小越好
+  
+  inference:                                 # 推理配置
+    batch_size: 32                           # 推理批大小
+    save_predictions: true                   # 是否保存預測結果
+
+# 可視化配置 - 定義訓練過程和結果的可視化
+visualization:
+  enabled: true                              # 是否啟用可視化
+  
+  tensorboard:                               # TensorBoard可視化
+    enabled: true                            # 啟用TensorBoard
+    log_dir: 'tensorboard_logs'              # TensorBoard日誌目錄
+  
+  scatter_plot:                              # 散點圖可視化（真實值vs預測值）
+    enabled: true                            # 啟用散點圖
+  
+  tsne:                                      # t-SNE降維可視化
+    enabled: true                            # 啟用t-SNE
+    perplexity: 30                           # t-SNE困惑度參數
+    n_components: 2                          # 降維後的維度 
+
+# Hook配置 - 啟用各種模型分析和數據收集鉤子
+hooks:
+  # 模型分析鉤子：收集層激活值和梯度
+  model_analytics:
+    enabled: true
+    monitored_layers: ['backbone.0', 'backbone.4', 'backbone.5', 'backbone.6', 'backbone.7', 'head']  # 監控主要層
+    monitored_params: ['head.2.weight', 'head.2.bias']   # 監控分類頭的權重和偏置
+    save_frequency: 1  # 保存頻率（每 N 個 epoch 保存一次）
+    save_validation_predictions: true  # 是否在每個 epoch 保存驗證集預測結果
+  
+  # 評估結果捕獲鉤子：收集測試集的真實標籤和模型預測
+  evaluation_capture:
+    enabled: true
+    datasets: ['test', 'val']  # 要捕獲結果的數據集
+    save_probabilities: false  # 回歸任務不需要保存概率
+  
+  # 激活值捕獲鉤子：收集特定層的激活值
+  activation_capture:
+    enabled: true
+    target_layers: ['backbone.4', 'backbone.7', 'head.0']  # 捕獲關鍵層的激活值
+    datasets: ['test']  # 在哪些數據集上捕獲
+    include_sample_ids: true  # 是否包含樣本ID 

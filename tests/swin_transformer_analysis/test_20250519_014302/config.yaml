@@ -1,0 +1,140 @@
+data:
+  dataloader:
+    batch_size: 32
+    drop_last: false
+    num_workers: 4
+    pin_memory: true
+  filter_criteria:
+    selection: null
+    status: null
+  index_path: data/metadata/selection_groups/biscuit_20250516_230749.csv
+  label_field: DrLee_Evaluation
+  preprocessing:
+    features:
+      hop_length: 512
+      log_mel: true
+      method: mel_spectrogram
+      n_fft: 1024
+      n_mels: 128
+  splits:
+    split_by_patient: true
+    split_seed: 42
+    test_ratio: 0.2
+    train_ratio: 0.5
+    val_ratio: 0.3
+  transforms:
+    test: {}
+    train:
+      time_shift:
+        enabled: true
+        max_shift_sec: 0.5
+      volume_scale:
+        enabled: true
+        max_scale: 1.2
+        min_scale: 0.8
+    val: {}
+  type: audio
+  use_index: true
+evaluation:
+  inference:
+    batch_size: 32
+    save_predictions: true
+  metrics:
+  - accuracy
+  - precision
+  - recall
+  - f1
+  validation:
+    best_model_metric: accuracy
+    best_model_mode: max
+    frequency: 1
+global:
+  debug: false
+  device: auto
+  experiment_name: indexed_classification_drlee
+  logging_level: INFO
+  output_dir: results
+  seed: 42
+hooks:
+  evaluation_capture:
+    datasets:
+    - test
+    - val
+    enabled: true
+    save_probabilities: true
+  model_analytics:
+    compute_similarity: true
+    compute_tsne: true
+    enabled: true
+    feature_vector_layers:
+    - backbone.features.4
+    - backbone.features.7
+    - head.0
+    monitored_layers:
+    - backbone.features.0
+    - backbone.features.2
+    - backbone.features.4
+    - backbone.features.5
+    - head.1
+    - skip_connection.2
+    monitored_params:
+    - head.1.weight
+    - head.1.bias
+    - skip_connection.0.weight
+    - skip_connection.0.bias
+    - skip_connection.2.weight
+    - skip_connection.2.bias
+    save_frequency: 5
+    save_validation_predictions: true
+    tsne_perplexity: 30
+model:
+  parameters:
+    dropout_rate: 0.1
+    in_channels: 3
+    input_size:
+    - 224
+    - 224
+    is_classification: true
+    model_name: swin_tiny_patch4_window7_224
+    num_classes: 3
+    pretrained: true
+    use_visual_prompting: false
+  type: swin_transformer
+training:
+  early_stopping:
+    enabled: false
+    min_delta: 0.001
+    patience: 10
+  epochs: 30
+  gradient_clipping:
+    enabled: true
+    max_norm: 1.0
+  loss:
+    parameters:
+      reduction: mean
+    type: CrossEntropyLoss
+  lr_scheduler:
+    parameters:
+      factor: 0.5
+      min_lr: 1.0e-06
+      mode: min
+      patience: 5
+    type: ReduceLROnPlateau
+  optimizer:
+    parameters:
+      lr: 0.001
+      weight_decay: 0.0001
+    type: Adam
+  save_every: 5
+visualization:
+  confusion_matrix:
+    enabled: true
+    normalize: 'true'
+  enabled: true
+  tensorboard:
+    enabled: true
+    log_dir: tensorboard_logs
+  tsne:
+    enabled: true
+    n_components: 2
+    perplexity: 30

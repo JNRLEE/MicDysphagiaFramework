@@ -151,7 +151,28 @@ class SpectrogramDataset(IndexedDatasetBase):
         Returns:
             torch.Tensor: 加載的頻譜圖數據
         """
-        spec_path = data_row['file_path']
+        # 優先使用spectrogram_path欄位，如果有的話
+        if 'spectrogram_path' in data_row and os.path.exists(data_row['spectrogram_path']):
+            spec_path = data_row['spectrogram_path']
+        else:
+            # file_path可能是目錄，需要尋找頻譜圖文件
+            dir_path = data_row['file_path']
+            if os.path.isdir(dir_path):
+                # 嘗試查找標準頻譜圖文件名
+                spec_path = os.path.join(dir_path, 'spectrogram.png')
+                
+                if not os.path.exists(spec_path):
+                    # 嘗試查找目錄中的任何.png文件
+                    png_files = [f for f in os.listdir(dir_path) if f.endswith('.png')]
+                    if png_files:
+                        spec_path = os.path.join(dir_path, png_files[0])
+                    else:
+                        logger.warning(f"在目錄 {dir_path} 中找不到頻譜圖文件，將返回空張量")
+                        # 返回全黑圖像作為後備
+                        return torch.zeros(3, self.resize[0], self.resize[1])
+            else:
+                # 可能file_path本身就是文件
+                spec_path = dir_path
         
         # 檢查文件是否存在
         if not os.path.exists(spec_path):

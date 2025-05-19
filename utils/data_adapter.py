@@ -463,7 +463,44 @@ class AdapterDataLoader:
     def __next__(self):
         """獲取下一個批次"""
         batch = next(self.iterator)
-        return DataAdapter.adapt_batch(batch, self.model_type, self.config)
+        
+        # 檢查批次類型，支持字典或元組/列表格式
+        if isinstance(batch, (list, tuple)):
+            # 將元組/列表轉換為字典格式
+            # 假設第一個元素是數據，第二個元素是標籤
+            if len(batch) >= 2:
+                # 檢測數據類型
+                data_type = None
+                data = batch[0]
+                
+                # 根據形狀推測數據類型
+                if len(data.shape) >= 2:
+                    if data.shape[1] == 1 or data.shape[1] == 2:  # 通常音頻是 [batch, channels, time]
+                        data_type = 'audio'
+                    elif data.shape[1] == 3:  # 通常圖像/頻譜圖是 [batch, channels, height, width]
+                        data_type = 'spectrogram'
+                    elif data.shape[1] > 10:  # 特徵通常是 [batch, features]
+                        data_type = 'features'
+                
+                # 如果無法檢測，默認為音頻
+                if data_type is None:
+                    data_type = 'audio'
+                    
+                # 創建兼容的字典
+                batch_dict = {data_type: data, 'label': batch[1]}
+                
+                # 記錄轉換
+                logger.debug(f"將元組/列表批次轉換為字典: {{{data_type}: Tensor({data.shape}), label: ...}}")
+                
+                # 使用字典進行適配
+                return DataAdapter.adapt_batch(batch_dict, self.model_type, self.config)
+            else:
+                # 如果元組/列表元素不足，使用原始批次
+                logger.warning("批次元素不足，無法推斷數據類型")
+                return batch
+        else:
+            # 原始處理（如果已經是字典）
+            return DataAdapter.adapt_batch(batch, self.model_type, self.config)
     
     def __len__(self):
         """返回數據加載器長度"""

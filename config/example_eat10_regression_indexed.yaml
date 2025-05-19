@@ -1,14 +1,14 @@
 # 使用索引CSV的EAT-10回歸任務示例配置
 # 此配置文件展示了如何使用索引CSV進行EAT-10分數回歸預測
 # 主要特點：使用score欄位作為回歸目標，按患者ID拆分數據
-
+# python scripts/run_experiments.py --config config/example_eat10_regression_indexed.yaml
 # 全局配置 - 設置實驗環境和輸出
 global:
   experiment_name: 'indexed_eat10_regression'  # 實驗名稱，用於日誌和輸出文件命名
   seed: 42                                     # 隨機種子，確保結果可重現
   debug: false                                 # 是否啟用調試模式
   device: 'auto'                               # 訓練設備，'auto'會自動選擇GPU或CPU
-  output_dir: 'outputs'                        # 輸出目錄，存放模型、日誌和結果
+  output_dir: 'results'                        # 輸出目錄，存放模型、日誌和結果
   logging_level: 'INFO'                        # 日誌級別，可選'DEBUG', 'INFO', 'WARNING', 'ERROR'
 
 # 數據配置 - 定義數據加載和預處理方式
@@ -17,7 +17,7 @@ data:
   
   # 索引CSV配置 - 啟用索引CSV支持，實現靈活的數據選擇和標籤映射
   use_index: true                              # 啟用索引CSV功能
-  index_path: 'data/data_index.csv'            # 索引CSV文件路徑
+  index_path: 'data/metadata/data_index.csv'            # 索引CSV文件路徑
   label_field: 'score'                         # 使用EAT-10分數作為標籤欄位（回歸任務）
   filter_criteria:                             # 數據篩選條件
     status: 'processed'                        # 只使用處理過的數據
@@ -74,12 +74,12 @@ model:
     model_name: 'resnet18'                     # 具體的ResNet變體
     pretrained: true                           # 是否使用預訓練權重
     num_classes: 1                             # 輸出維度為1（回歸任務）
-    input_channels: 1                          # 輸入通道數（單通道音頻）
+    input_channels: 3                          # 輸入通道數（對應轉換後的RGB頻譜圖）
     is_classification: false                   # 確認這是回歸任務，而非分類任務
 
 # 訓練配置 - 定義訓練過程和優化器
 training:
-  epochs: 100                                  # 最大訓練輪數
+  epochs: 3  # Modified to 3 epochs for quick testing
   early_stopping:                              # 早停機制，防止過擬合
     enabled: true                              # 啟用早停
     patience: 10                               # 容忍輪數，驗證指標不再改善時等待的輪數

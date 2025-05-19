@@ -106,6 +106,33 @@ class AudioDataset(IndexedDatasetBase):
             # 設置轉換函數
             self.set_transforms(self.transform_config)
             
+            # 從 data_df 創建 samples 列表，以便與直接模式兼容
+            if hasattr(self, 'data_df') and self.data_df is not None:
+                self.samples = []
+                for idx, row in self.data_df.iterrows():
+                    sample = row.to_dict()
+                    # 確保樣本包含必要的字段
+                    if 'patient_id' not in sample and 'file_path' in sample:
+                        # 嘗試從文件路徑提取患者ID
+                        file_path = sample['file_path']
+                        patient_id = os.path.basename(os.path.dirname(file_path))
+                        sample['patient_id'] = patient_id
+                    
+                    # 確保樣本包含標籤
+                    if 'label' not in sample and hasattr(self, 'labels') and idx < len(self.labels):
+                        sample['label'] = self.labels[idx]
+                    
+                    # 確保樣本包含音頻路徑
+                    if 'audio_path' not in sample and 'file_path' in sample:
+                        sample['audio_path'] = sample['file_path']
+                    
+                    self.samples.append(sample)
+                
+                logger.info(f"從數據索引創建了 {len(self.samples)} 個樣本")
+            else:
+                self.samples = []
+                logger.warning("無法從數據索引創建樣本列表，samples 將為空")
+            
         else:
             # 直接模式初始化
             if root_dir is None or config is None:
@@ -159,7 +186,29 @@ class AudioDataset(IndexedDatasetBase):
         Returns:
             torch.Tensor: 加載的音頻數據
         """
-        wav_path = data_row['file_path']
+        # 使用wav_path欄位，如果存在且有效；否則，從file_path構建
+        if 'wav_path' in data_row and os.path.exists(data_row['wav_path']):
+            wav_path = data_row['wav_path']
+        else:
+            # file_path可能是目錄，需要追加標準WAV文件名
+            dir_path = data_row['file_path']
+            if os.path.isdir(dir_path):
+                wav_path = os.path.join(dir_path, 'Probe0_RX_IN_TDM4CH0.wav')
+                if not os.path.exists(wav_path):
+                    # 嘗試查找目錄中的任何.wav文件
+                    wav_files = [f for f in os.listdir(dir_path) if f.endswith('.wav')]
+                    if wav_files:
+                        wav_path = os.path.join(dir_path, wav_files[0])
+                    else:
+                        logger.error(f"在目錄 {dir_path} 中找不到WAV文件")
+                        # 返回零張量作為後備
+                        if self.max_len:
+                            return torch.zeros(1, self.max_len)
+                        else:
+                            return torch.zeros(1, int(self.sample_rate * 5))  # 默認5秒
+            else:
+                # 可能file_path本身就是文件
+                wav_path = dir_path
         
         try:
             # 加載WAV文件
@@ -558,7 +607,7 @@ class AudioDataset(IndexedDatasetBase):
         test_ratio: float = 0.15,
         seed: int = 42
     ) -> Tuple[List[int], List[int], List[int]]:
-        """按患者ID拆分數據集 (基於過濾後的 self.samples)
+        """按患者ID拆分數據集，確保N開頭和P開頭的患者ID在各集合中均勻分佈
         
         Args:
             train_ratio (float, optional): 訓練集比例. 預設為 0.7.
@@ -567,8 +616,22 @@ class AudioDataset(IndexedDatasetBase):
             seed (int, optional): 隨機種子. 預設為 42.
             
         Returns:
-            Tuple[List[int], List[int], List[int]]: 訓練、驗證和測試樣本在 self.samples 中的索引列表
+            Tuple[List[int], List[int], List[int]]: 訓練、驗證和測試樣本的索引列表
         """
+        # 優先使用父類的實現（基於 data_df）
+        if not self.is_direct_mode and hasattr(self, 'data_df') and self.data_df is not None and 'patient_id' in self.data_df.columns:
+            return super().split_by_patient(
+                train_ratio=train_ratio,
+                val_ratio=val_ratio,
+                test_ratio=test_ratio,
+                seed=seed
+            )
+        
+        # 如果父類實現不可用，則使用基於 samples 的實現
+        if not hasattr(self, 'samples') or not self.samples:
+            logger.warning("無法按患者ID拆分數據集，因為沒有樣本")
+            return [], [], []
+        
         # 確保比例總和約等於 1
         total = train_ratio + val_ratio + test_ratio
         if not np.isclose(total, 1.0):
@@ -583,7 +646,11 @@ class AudioDataset(IndexedDatasetBase):
         # 建立患者ID到 self.samples 索引的映射
         patient_to_sample_indices = {}
         for i, sample in enumerate(self.samples):
-            patient_id = sample['patient_id']
+            patient_id = sample.get('patient_id')
+            if not patient_id:
+                logger.warning(f"樣本 {i} 沒有患者ID，將被跳過")
+                continue
+                
             if patient_id not in patient_to_sample_indices:
                 patient_to_sample_indices[patient_id] = []
             patient_to_sample_indices[patient_id].append(i)
@@ -591,42 +658,66 @@ class AudioDataset(IndexedDatasetBase):
         # 獲取唯一的患者ID列表
         unique_patient_ids = list(patient_to_sample_indices.keys())
         
-        # 打亂患者ID列表
-        random.shuffle(unique_patient_ids)
+        # 分別處理N開頭和P開頭的患者ID
+        n_prefixed_patients = [pid for pid in unique_patient_ids if pid.startswith('N')]
+        p_prefixed_patients = [pid for pid in unique_patient_ids if pid.startswith('P')]
+        other_patients = [pid for pid in unique_patient_ids if not (pid.startswith('N') or pid.startswith('P'))]
         
-        # 計算每個集合的患者數量
-        num_patients = len(unique_patient_ids)
-        train_patient_size = int(num_patients * train_ratio)
-        val_patient_size = int(num_patients * val_ratio)
-        # test_patient_size = num_patients - train_patient_size - val_patient_size # 確保所有患者都被分配
-
-        # 分割患者ID
-        train_patients = unique_patient_ids[:train_patient_size]
-        val_patients = unique_patient_ids[train_patient_size : train_patient_size + val_patient_size]
-        test_patients = unique_patient_ids[train_patient_size + val_patient_size:]
+        # 打亂各組患者ID
+        random.shuffle(n_prefixed_patients)
+        random.shuffle(p_prefixed_patients)
+        random.shuffle(other_patients)
         
-        # 根據分配的患者ID收集 self.samples 的索引
+        logger.info(f"患者ID分佈: N開頭 {len(n_prefixed_patients)} 位, P開頭 {len(p_prefixed_patients)} 位, 其他 {len(other_patients)} 位")
+        
+        # 為每組計算分割點
+        n_train_size = int(len(n_prefixed_patients) * train_ratio)
+        n_val_size = int(len(n_prefixed_patients) * val_ratio)
+        
+        p_train_size = int(len(p_prefixed_patients) * train_ratio)
+        p_val_size = int(len(p_prefixed_patients) * val_ratio)
+        
+        other_train_size = int(len(other_patients) * train_ratio)
+        other_val_size = int(len(other_patients) * val_ratio)
+        
+        # 分割各組患者ID
+        n_train = n_prefixed_patients[:n_train_size]
+        n_val = n_prefixed_patients[n_train_size:n_train_size+n_val_size]
+        n_test = n_prefixed_patients[n_train_size+n_val_size:]
+        
+        p_train = p_prefixed_patients[:p_train_size]
+        p_val = p_prefixed_patients[p_train_size:p_train_size+p_val_size]
+        p_test = p_prefixed_patients[p_train_size+p_val_size:]
+        
+        other_train = other_patients[:other_train_size]
+        other_val = other_patients[other_train_size:other_train_size+other_val_size]
+        other_test = other_patients[other_train_size+other_val_size:]
+        
+        # 合併各組患者ID
+        train_patients = n_train + p_train + other_train
+        val_patients = n_val + p_val + other_val
+        test_patients = n_test + p_test + other_test
+        
+        # 記錄各集合的患者ID分佈
+        logger.info(f"訓練集患者ID分佈: N開頭 {len(n_train)} 位, P開頭 {len(p_train)} 位, 其他 {len(other_train)} 位")
+        logger.info(f"驗證集患者ID分佈: N開頭 {len(n_val)} 位, P開頭 {len(p_val)} 位, 其他 {len(other_val)} 位")
+        logger.info(f"測試集患者ID分佈: N開頭 {len(n_test)} 位, P開頭 {len(p_test)} 位, 其他 {len(other_test)} 位")
+        
+        # 收集每個集合的樣本索引
         train_indices = []
-        val_indices = []
-        test_indices = []
-        
         for patient_id in train_patients:
             train_indices.extend(patient_to_sample_indices[patient_id])
+            
+        val_indices = []
         for patient_id in val_patients:
             val_indices.extend(patient_to_sample_indices[patient_id])
+            
+        test_indices = []
         for patient_id in test_patients:
             test_indices.extend(patient_to_sample_indices[patient_id])
             
-        # 隨機打亂每個集合內的索引（可選，但通常是好的做法）
-        random.shuffle(train_indices)
-        random.shuffle(val_indices)
-        random.shuffle(test_indices)
-
-        logger.info(f"數據集按患者ID拆分 (基於 {len(self.samples)} 個過濾後樣本) - "
-                    f"訓練: {len(train_indices)} 樣本 ({len(train_patients)} 患者), "
-                    f"驗證: {len(val_indices)} 樣本 ({len(val_patients)} 患者), "
-                    f"測試: {len(test_indices)} 樣本 ({len(test_patients)} 患者)")
-            
+        logger.info(f"按患者ID拆分數據集: 訓練集 {len(train_indices)} 個樣本，驗證集 {len(val_indices)} 個樣本，測試集 {len(test_indices)} 個樣本")
+        
         return train_indices, val_indices, test_indices
 
     def extract_mel_spectrogram(self, audio: np.ndarray, n_mels: int = 128) -> np.ndarray:

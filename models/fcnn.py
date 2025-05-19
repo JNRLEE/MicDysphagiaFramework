@@ -135,12 +135,22 @@ class FCNN(nn.Module):
             
             # 調整維度（截斷或填充）
             if x.size(1) > self.input_dim:
-                logger.info(f"截斷特徵: {x.size(1)} -> {self.input_dim}")
-                x = x[:, :self.input_dim]
+                # 如果輸入特徵更長，優先採用置中截斷而非右側截斷
+                logger.info(f"置中截斷特徵: {x.size(1)} -> {self.input_dim}")
+                start = (x.size(1) - self.input_dim) // 2
+                x = x[:, start:start + self.input_dim]
             else:
-                logger.info(f"填充特徵: {x.size(1)} -> {self.input_dim}")
-                padding = torch.zeros(batch_size, self.input_dim - x.size(1), device=x.device)
-                x = torch.cat([x, padding], dim=1)
+                # 如果輸入特徵更短，採用置中填充而非右側填充
+                logger.info(f"置中填充特徵: {x.size(1)} -> {self.input_dim}")
+                padding_left = (self.input_dim - x.size(1)) // 2
+                padding_right = self.input_dim - x.size(1) - padding_left
+                
+                # 創建左右填充
+                padding_l = torch.zeros(batch_size, padding_left, device=x.device)
+                padding_r = torch.zeros(batch_size, padding_right, device=x.device)
+                
+                # 將特徵向量置中
+                x = torch.cat([padding_l, x, padding_r], dim=1)
         
         # 確保張量形狀正確並且是連續的
         x = x.contiguous()

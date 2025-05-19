@@ -6,6 +6,8 @@
 3. 支持按患者ID拆分數據集
 4. 支持特徵標準化和轉換
 5. 支持從索引CSV加載數據
+6. 支持特徵向量置中填充
+7. 支持PCA降維壓縮特徵向量
 
 數據讀取邏輯：
 1. NPZ特徵文件讀取:
@@ -50,6 +52,7 @@ from typing import Dict, List, Tuple, Any, Optional, Union, Callable
 from pathlib import Path
 import random
 from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA  # 添加PCA引入
 
 # 引入索引數據集基類
 from data.indexed_dataset import IndexedDatasetBase
@@ -65,6 +68,7 @@ class FeatureDataset(IndexedDatasetBase):
     3. 支持特徵標準化和轉換
     4. 支持按患者ID拆分數據集
     5. 支持從索引CSV加載數據
+    6. 支持PCA降維壓縮特徵
     
     數據讀取模式：
     1. 索引模式：使用data_index.csv加載數據
@@ -88,7 +92,12 @@ class FeatureDataset(IndexedDatasetBase):
         # 新增索引模式參數
         index_path: Optional[str] = None,
         label_field: str = 'score',
-        filter_criteria: Optional[Dict] = None
+        filter_criteria: Optional[Dict] = None,
+        # 新增填充模式參數
+        padding_mode: Optional[str] = None,
+        # 新增降維參數
+        compression_method: Optional[str] = None,
+        target_dim: Optional[int] = None
     ):
         """初始化特徵數據集
         
@@ -101,6 +110,9 @@ class FeatureDataset(IndexedDatasetBase):
             index_path: 索引CSV文件路徑（索引模式必填）
             label_field: 標籤欄位名稱，可以是'score', 'DrLee_Evaluation', 'DrTai_Evaluation', 'selection'
             filter_criteria: 篩選條件字典
+            padding_mode: 填充模式，'right'(默認)或'center'(置中填充)
+            compression_method: 壓縮方法，'pca'(PCA降維)或None(不壓縮)
+            target_dim: 目標維度，用於PCA降維
         """
         # 決定是否使用索引模式
         self.use_index_mode = index_path is not None and os.path.exists(index_path)
@@ -110,6 +122,8 @@ class FeatureDataset(IndexedDatasetBase):
         self.cache_features = cache_features
         self.feature_cache = {}
         self.scaler = None
+        self.pca = None  # 初始化PCA為None
+        self.samples = []  # 確保samples始終被初始化為空列表
         
         if self.use_index_mode:
             # 索引模式初始化
@@ -120,6 +134,14 @@ class FeatureDataset(IndexedDatasetBase):
             self.feature_config = self.config.get('data', {}).get('preprocessing', {}).get('features', {})
             self.normalize = self.feature_config.get('normalize', True)
             
+            # 獲取padding_mode配置
+            self.padding_mode = padding_mode or self.feature_config.get('padding_mode', 'right')
+            self.max_feature_dim = self.feature_config.get('max_feature_dim', 1024)
+            
+            # 獲取壓縮方法配置
+            self.compression_method = compression_method or self.feature_config.get('compression_method', None)
+            self.target_dim = target_dim or self.feature_config.get('target_dim', self.max_feature_dim)
+            
             # 呼叫父類初始化
             super().__init__(
                 index_path=index_path,
@@ -128,6 +150,37 @@ class FeatureDataset(IndexedDatasetBase):
                 filter_criteria=filter_criteria,
                 fallback_to_direct=True
             )
+            
+            # 從data_df創建samples列表，以便與直接模式兼容
+            if hasattr(self, 'data_df') and self.data_df is not None:
+                self.samples = []
+                for idx, row in self.data_df.iterrows():
+                    sample = row.to_dict()
+                    # 確保樣本包含必要的字段
+                    if 'patient_id' not in sample and 'file_path' in sample:
+                        # 嘗試從文件路徑提取患者ID
+                        file_path = sample['file_path']
+                        patient_id = os.path.basename(os.path.dirname(file_path))
+                        sample['patient_id'] = patient_id
+                    
+                    # 確保樣本包含標籤
+                    if 'label' not in sample and hasattr(self, 'labels') and idx < len(self.labels):
+                        sample['label'] = self.labels[idx]
+                    
+                    self.samples.append(sample)
+                
+                logger.info(f"從數據索引創建了 {len(self.samples)} 個樣本")
+                
+                # 如果使用置中填充，先掃描所有特徵以找出最大長度
+                if self.padding_mode == 'center':
+                    logger.info(f"使用置中填充模式，開始掃描最大特徵長度...")
+                    self.max_feature_length = self._scan_max_feature_length()
+                    logger.info(f"掃描完成，最大特徵長度: {self.max_feature_length}")
+                
+                # 如果使用PCA降維，初始化PCA模型
+                if self.compression_method == 'pca' and is_train:
+                    logger.info(f"使用PCA降維，初始化PCA模型 (目標維度: {self.target_dim})...")
+                    self._init_pca()
             
             # 如果需要標準化並處於訓練模式，初始化標準化器
             if self.normalize and is_train and not self.is_direct_mode:
@@ -142,11 +195,16 @@ class FeatureDataset(IndexedDatasetBase):
             self.config = config
             self.is_direct_mode = True
             
-            # 設置日誌級別
-            logging.basicConfig(level=logging.INFO)
-            
             # 獲取特徵配置
             self.feature_config = config.get('data', {}).get('preprocessing', {}).get('features', {})
+            
+            # 獲取padding_mode配置
+            self.padding_mode = padding_mode or self.feature_config.get('padding_mode', 'right')
+            self.max_feature_dim = self.feature_config.get('max_feature_dim', 1024)
+            
+            # 獲取壓縮方法配置
+            self.compression_method = compression_method or self.feature_config.get('compression_method', None)
+            self.target_dim = target_dim or self.feature_config.get('target_dim', self.max_feature_dim)
             
             # 獲取feature_type，可能存在不同位置
             data_config = config.get('data', {})
@@ -160,12 +218,12 @@ class FeatureDataset(IndexedDatasetBase):
                 self.feature_type = self.feature_extension  # 使用擴展名作為類型
             
             # 確保兼容性
-            if self.feature_type not in ['json', 'csv', 'npz']:
+            if self.feature_type not in ['json', 'csv', 'npz', 'npy']:
                 logger.warning(f"未識別的特徵類型 '{self.feature_type}'，使用 feature_extension '{self.feature_extension}' 代替")
-                if self.feature_extension in ['json', 'csv', 'npz']:
+                if self.feature_extension in ['json', 'csv', 'npz', 'npy']:
                     self.feature_type = self.feature_extension
                 else:
-                    logger.warning(f"無法確定特徵類型，將嘗試依次搜索 json, csv, npz 格式的文件")
+                    logger.warning(f"無法確定特徵類型，將嘗試依次搜索 json, csv, npz, npy 格式的文件")
                     self.feature_type = 'auto'  # 自動檢測
                 
             self.feature_names = self.feature_config.get('names', [])  # 要使用的特徵列表
@@ -179,6 +237,17 @@ class FeatureDataset(IndexedDatasetBase):
             self.samples = self._collect_samples()
             
             logger.info(f"加載了 {len(self.samples)} 個特徵樣本")
+            
+            # 如果使用置中填充，先掃描所有特徵以找出最大長度
+            if self.padding_mode == 'center':
+                logger.info(f"使用置中填充模式，開始掃描最大特徵長度...")
+                self.max_feature_length = self._scan_max_feature_length()
+                logger.info(f"掃描完成，最大特徵長度: {self.max_feature_length}")
+            
+            # 如果使用PCA降維，初始化PCA模型
+            if self.compression_method == 'pca' and is_train:
+                logger.info(f"使用PCA降維，初始化PCA模型 (目標維度: {self.target_dim})...")
+                self._init_pca()
             
             # 如果需要標準化並處於訓練模式，初始化標準化器
             if self.normalize and is_train:
@@ -203,7 +272,32 @@ class FeatureDataset(IndexedDatasetBase):
         Returns:
             torch.Tensor: 加載的特徵數據
         """
-        file_path = data_row['file_path']
+        # 優先使用features_path欄位，如果有的話
+        if 'features_path' in data_row and os.path.exists(data_row['features_path']):
+            file_path = data_row['features_path']
+        else:
+            # file_path可能是目錄，需要尋找特徵文件
+            dir_path = data_row['file_path']
+            if os.path.isdir(dir_path):
+                # 嘗試查找命名慣例的特徵文件
+                dir_name = os.path.basename(dir_path)
+                feature_path = os.path.join(dir_path, f"{dir_name}_features.npy")
+                
+                if os.path.exists(feature_path):
+                    file_path = feature_path
+                else:
+                    # 嘗試查找目錄中的任何.npy文件
+                    npy_files = [f for f in os.listdir(dir_path) if f.endswith('_features.npy') or f.endswith('.npz') or f.endswith('.npy')]
+                    if npy_files:
+                        file_path = os.path.join(dir_path, npy_files[0])
+                    else:
+                        logger.error(f"在目錄 {dir_path} 中找不到特徵文件")
+                        # 返回零張量作為後備
+                        feature_dim = self._infer_feature_dim()
+                        return torch.zeros(feature_dim, dtype=torch.float32)
+            else:
+                # 可能file_path本身就是文件
+                file_path = dir_path
         
         # 檢查緩存
         if self.cache_features and file_path in self.feature_cache:
@@ -232,8 +326,14 @@ class FeatureDataset(IndexedDatasetBase):
         except Exception as e:
             logger.error(f"加載特徵文件失敗: {file_path}, 錯誤: {str(e)}")
             # 返回零張量作為後備
-            # 嘗試獲取一個合理的特徵維度
-            feature_dim = self._infer_feature_dim()
+            
+            # 如果使用置中填充模式，創建與max_feature_length相同長度的零張量
+            if self.padding_mode == 'center' and hasattr(self, 'max_feature_length'):
+                feature_dim = self.max_feature_length
+            else:
+                # 否則使用配置的max_feature_dim或推斷的特徵維度
+                feature_dim = self._infer_feature_dim()
+                
             return torch.zeros(feature_dim, dtype=torch.float32)
     
     def direct_getitem(self, idx: int) -> Tuple[torch.Tensor, Any]:
@@ -283,18 +383,30 @@ class FeatureDataset(IndexedDatasetBase):
     def _infer_feature_dim(self) -> int:
         """推斷特徵維度
         
-        Returns:
-            int: 特徵維度，默認為10
-        """
-        # 如果有樣本，嘗試加載第一個樣本獲取維度
-        if hasattr(self, 'samples') and self.samples:
-            try:
-                features = self._load_features(0)
-                return len(features)
-            except:
-                pass
+        嘗試從配置或現有樣本中推斷特徵向量的維度
         
-        return 10  # 默認值
+        Returns:
+            int: 推斷的特徵維度，如果無法推斷則返回默認值1024
+        """
+        # 從配置中獲取
+        max_feature_dim = self.feature_config.get('max_feature_dim', None)
+        if max_feature_dim is not None:
+            return max_feature_dim
+        
+        # 嘗試從樣本中獲取
+        if hasattr(self, 'samples') and len(self.samples) > 0:
+            for sample in self.samples:
+                try:
+                    if 'features_path' in sample and os.path.exists(sample['features_path']):
+                        # 嘗試加載第一個樣本的特徵以推斷維度
+                        features = self._load_feature_by_path(sample['features_path'])
+                        if features is not None:
+                            return len(features)
+                except Exception:
+                    pass
+        
+        # 默認值
+        return 1024
     
     def _load_feature_by_path(self, file_path: str) -> np.ndarray:
         """根據文件路徑加載特徵
@@ -308,14 +420,120 @@ class FeatureDataset(IndexedDatasetBase):
         # 根據擴展名判斷文件類型
         ext = os.path.splitext(file_path)[1].lower()
         
-        if ext == '.npz':
-            return self._load_npz_feature(file_path)
-        elif ext == '.json':
-            return self._load_json_feature(file_path)
-        elif ext == '.csv':
-            return self._load_csv_feature(file_path)
-        else:
-            raise ValueError(f"不支持的特徵文件類型: {ext}")
+        try:
+            if ext == '.npz':
+                features = self._load_npz_feature(file_path)
+            elif ext == '.npy':
+                features = self._load_npy_feature(file_path)
+            elif ext == '.json':
+                features = self._load_json_feature(file_path)
+            elif ext == '.csv':
+                features = self._load_csv_feature(file_path)
+            else:
+                raise ValueError(f"不支持的特徵文件類型: {ext}")
+            
+            # 特徵處理邏輯 (先填充，再PCA降維)
+            if self.padding_mode == 'center' and hasattr(self, 'max_feature_length'):
+                # 步驟1: 使用置中填充
+                features = self._center_pad_features(features, self.max_feature_length)
+            
+            # 步驟2: 如果啟用了PCA降維
+            if self.compression_method == 'pca' and self.pca is not None:
+                original_length = len(features)
+                features = self._apply_pca(features)
+                logger.debug(f"PCA降維: {original_length} -> {len(features)}")
+            elif len(features) > self.max_feature_dim:
+                # 如果未使用PCA，則使用傳統的截斷方法
+                features = features[:self.max_feature_dim]
+                
+            return features
+                
+        except Exception as e:
+            logger.error(f"加載特徵文件失敗: {file_path}, 錯誤: {str(e)}")
+            raise ValueError(f"無法加載特徵文件 {file_path}: {str(e)}")
+    
+    def _load_npz_feature(self, file_path: str) -> np.ndarray:
+        """加載NPZ格式的特徵文件
+        
+        Args:
+            file_path: NPZ文件路徑
+            
+        Returns:
+            np.ndarray: 特徵數組
+        """
+        try:
+            data = np.load(file_path, allow_pickle=True)
+            
+            # 優先從'features'鍵獲取特徵
+            if 'features' in data:
+                features = data['features']
+                if isinstance(features, np.ndarray):
+                    return features
+            
+            # 否則嘗試提取所有非元數據字段
+            feature_arrays = []
+            for key in data.keys():
+                if key != 'metadata':
+                    arr = data[key]
+                    if isinstance(arr, np.ndarray):
+                        feature_arrays.append(arr)
+            
+            if feature_arrays:
+                # 如果有多個特徵數組，連接它們
+                return np.concatenate(feature_arrays, axis=0)
+            
+            raise ValueError(f"NPZ文件 {file_path} 中找不到有效的特徵數據")
+            
+        except Exception as e:
+            raise ValueError(f"無法加載NPZ文件 {file_path}: {str(e)}")
+    
+    def _load_npy_feature(self, file_path: str) -> np.ndarray:
+        """加載NPY格式的特徵文件
+        
+        Args:
+            file_path: NPY文件路徑
+            
+        Returns:
+            np.ndarray: 特徵數組
+        """
+        try:
+            # 直接使用numpy.load加載.npy文件
+            features = np.load(file_path)
+            
+            # 確保特徵是一維數組
+            if features.ndim > 1:
+                # 記錄原始形狀以便日誌
+                original_shape = features.shape
+                features = features.flatten()
+                logger.debug(f"將特徵從形狀 {original_shape} 展平為 {features.shape}")
+            
+            return features
+            
+        except Exception as e:
+            raise ValueError(f"無法加載NPY文件 {file_path}: {str(e)}")
+    
+    def _load_json_feature(self, file_path: str) -> np.ndarray:
+        """加載JSON格式的特徵文件
+        
+        Args:
+            file_path: JSON文件路徑
+            
+        Returns:
+            np.ndarray: 特徵數組
+        """
+        try:
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+            
+            if isinstance(data, dict):
+                return np.array(list(data.values()))
+            elif isinstance(data, list) and len(data) > 0:
+                return np.array(data)
+            else:
+                raise ValueError(f"不支持的JSON格式: {type(data)}")
+            
+        except Exception as e:
+            raise ValueError(f"無法加載JSON文件 {file_path}: {str(e)}")
     
     def _collect_samples(self) -> List[Dict[str, Any]]:
         """收集所有樣本
@@ -350,7 +568,7 @@ class FeatureDataset(IndexedDatasetBase):
         if self.feature_type == 'auto':
             # 嘗試所有支持的格式
             logger.info("使用自動類型檢測模式")
-            for ext in ['json', 'npz', 'csv']:
+            for ext in ['json', 'npz', 'npy', 'csv']:
                 file_pattern = f"**/*.{ext}"
                 files = list(self.data_path.glob(file_pattern))
                 if files:
@@ -359,7 +577,7 @@ class FeatureDataset(IndexedDatasetBase):
                     break
             
             if self.feature_type == 'auto':
-                logger.error(f"沒有在目錄 {self.data_path} 中找到支持的特徵文件 (json, npz, csv)")
+                logger.error(f"沒有在目錄 {self.data_path} 中找到支持的特徵文件 (json, npz, npy, csv)")
                 # 查找所有文件和子目錄
                 all_files = list(self.data_path.glob("**/*"))
                 logger.info(f"目錄中所有項目 ({len(all_files)} 個):")
@@ -580,6 +798,81 @@ class FeatureDataset(IndexedDatasetBase):
                 except Exception as e:
                     logger.error(f"讀取 {feature_file} 失敗: {str(e)}，跳過")
                     
+        elif self.feature_type == 'npy' or (feature_extension and feature_extension.lower() == 'npy'):
+            # 查找所有NPY特徵文件
+            feature_files = list(self.data_path.glob("**/*.npy"))
+            logger.info(f"找到 {len(feature_files)} 個NPY特徵文件")
+            
+            # 輸出所有找到的文件路徑以便檢查
+            for i, file_path in enumerate(feature_files):
+                logger.info(f"NPY文件 {i+1}: {file_path}")
+            
+            for feature_file in feature_files:
+                try:
+                    logger.info(f"嘗試讀取NPY文件: {feature_file}")
+                    
+                    # 從文件路徑提取患者ID
+                    file_path_str = str(feature_file)
+                    
+                    # 提取患者ID (例如 P001, N021 等)
+                    patient_id_match = None
+                    for part in file_path_str.split('/'):
+                        if part.startswith('P') or part.startswith('N'):
+                            # 檢查是否匹配格式 P\d+ 或 N\d+
+                            import re
+                            match = re.match(r'([NP]\d+).*', part)
+                            if match:
+                                patient_id_match = match.group(1)
+                                break
+            
+                    # 如果沒有找到，嘗試從目錄名稱獲取
+                    if not patient_id_match:
+                        dir_name = os.path.dirname(file_path_str)
+                        for part in dir_name.split('/'):
+                            if part.startswith('P') or part.startswith('N'):
+                                match = re.match(r'([NP]\d+).*', part)
+                                if match:
+                                    patient_id_match = match.group(1)
+                                    break
+            
+                    patient_id = patient_id_match if patient_id_match else "Unknown"
+                    
+                    # 從分數數據庫或默認值中獲取分數
+                    # 這裡我們使用默認值, 實際應用中可以從外部數據庫獲取
+                    score = -1
+                    if patient_id.startswith('N'):
+                        # 假設所有N開頭的都是正常人
+                        score = 0
+                    elif patient_id.startswith('P'):
+                        # 假設所有P開頭的都是病人，分數大於9
+                        score = 10
+                    
+                    # 確定任務類型 (NoMovement, Cracker, WaterDrinking等)
+                    selection_type = None
+                    file_path_lower = file_path_str.lower()
+                    
+                    for task_name, keywords in task_name_mapping.items():
+                        for keyword in keywords:
+                            if keyword.lower() in file_path_lower:
+                                selection_type = task_name
+                                logger.info(f"從路徑 '{file_path_str}' 識別到任務類型: {selection_type} (關鍵詞: {keyword})")
+                                break
+                        if selection_type:
+                            break
+                    
+                    # 創建樣本
+                    sample = {
+                        'feature_path': str(feature_file),
+                        'patient_id': patient_id,
+                        'score': score,
+                        'selection_type': selection_type
+                    }
+                    samples.append(sample)
+                    logger.info(f"從 {feature_file} 加載NPY樣本: ID={patient_id}, 分數={score}, 選擇類型={selection_type}")
+                    
+                except Exception as e:
+                    logger.error(f"讀取 {feature_file} 失敗: {str(e)}，跳過")
+                    
         else:
             logger.error(f"不支持的特徵類型: {self.feature_type}")
             
@@ -777,354 +1070,60 @@ class FeatureDataset(IndexedDatasetBase):
             self.scaler = None
     
     def _load_features(self, idx: int) -> np.ndarray:
-        """加載特徵數據
-        
-        加載步驟：
-        1. 獲取樣本的特徵文件路徑
-        2. 根據文件類型選擇對應的加載方法:
-           a. NPZ文件:
-              - 使用np.load(file_path, allow_pickle=True)加載
-              - 優先從'features'字段提取特徵
-              - 如果不存在，則從所有非元數據字段提取
-           b. JSON文件:
-              - 使用json.load加載
-              - 支持單樣本或多樣本格式
-           c. CSV文件:
-              - 使用pandas.read_csv加載
-              - 提取特定行或列
-        3. 對特徵數據進行後處理:
-           - 確保特徵是一維向量
-           - 限制特徵維度(默認10000)，截斷過大的特徵
-           - 如果啟用標準化，使用預先訓練的scaler進行標準化
-        
-        注意事項:
-        - 支持緩存機制，如果idx已在緩存中直接返回
-        - 處理特徵加載過程中可能出現的異常
-        - 標準化可能因特徵維度不一致而失敗，此時返回原始特徵
+        """根據樣本索引加載特徵
         
         Args:
             idx (int): 樣本索引
             
         Returns:
-            np.ndarray: 特徵數組，如果加載失敗則返回空數組
+            np.ndarray: 特徵向量
         """
-        sample = self.samples[idx]
-        
-        # 如果已緩存，則直接返回
-        if self.cache_features and idx in self.feature_cache:
-            return self.feature_cache[idx]
-            
-        feature_path = sample['feature_path']
-        
-        try:
-            if self.feature_type == 'json':
-                with open(feature_path, 'r') as f:
-                    data = json.load(f)
-                    
-                if 'index_in_file' in sample:
-                    # 從集合中提取特定樣本
-                    data = data[sample['index_in_file']]
-                    
-                # 提取特徵
-                if self.feature_names:
-                    # 僅使用指定的特徵
-                    features = np.array([data.get(name, 0.0) for name in self.feature_names])
-                else:
-                    # 使用所有非元數據特徵
-                    metadata_fields = [self.patient_id_column, self.label_name, 'timestamp', 'selection']
-                    features = np.array([v for k, v in data.items() 
-                                       if k not in metadata_fields and isinstance(v, (int, float))])
-                
-            elif self.feature_type == 'csv':
-                df = pd.read_csv(feature_path)
-                
-                if 'index_in_file' in sample:
-                    # 從DataFrame中提取特定行
-                    row = df.iloc[sample['index_in_file']]
-                else:
-                    # 單個樣本的CSV
-                    row = df.iloc[0]
-                    
-                # 提取特徵
-                if self.feature_names:
-                    # 僅使用指定的特徵
-                    features = np.array([row.get(name, 0.0) for name in self.feature_names])
-                else:
-                    # 使用所有非元數據列
-                    metadata_fields = [self.patient_id_column, self.label_name, 'timestamp', 'selection']
-                    features = np.array([v for k, v in row.items() 
-                                       if k not in metadata_fields and isinstance(v, (int, float))])
-                    
-            elif self.feature_type == 'npz':
-                data = np.load(feature_path, allow_pickle=True)
-                
-                if 'index_in_file' in sample:
-                    # 多個樣本的NPZ
-                    if self.feature_names:
-                        # 僅使用指定的特徵
-                        features = np.array([data[name][sample['index_in_file']] 
-                                           if name in data else 0.0 
-                                           for name in self.feature_names])
-                    elif 'features' in data:
-                        # 使用專門的特徵數組
-                        features = data['features'][sample['index_in_file']]
-                    else:
-                        # 嘗試從所有非元數據字段中提取
-                        metadata_fields = [self.patient_id_column, self.label_name, 'timestamp', 'selection']
-                        features = np.array([data[k][sample['index_in_file']] 
-                                           for k in data.keys() 
-                                           if k not in metadata_fields and isinstance(data[k], np.ndarray)])
-                else:
-                    # 單個樣本的NPZ
-                    if self.feature_names:
-                        # 僅使用指定的特徵
-                        features = np.array([data[name] if name in data else 0.0 for name in self.feature_names])
-                    elif 'features' in data:
-                        # 使用專門的特徵數組
-                        features = data['features']
-                    else:
-                        # 嘗試從所有非元數據字段中提取
-                        metadata_fields = [self.patient_id_column, self.label_name, 'timestamp', 'selection']
-                        features = np.array([data[k] for k in data.keys() 
-                                           if k not in metadata_fields and isinstance(data[k], np.ndarray)])
-            else:
-                logger.error(f"不支持的特徵類型: {self.feature_type}")
-                return None
-                
-            # 確保特徵是一維數組
-            if features.ndim > 1:
-                # 記錄原始形狀以便日誌
-                original_shape = features.shape
-                features = features.flatten()
-                logger.debug(f"將特徵從形狀 {original_shape} 展平為 {features.shape}")
-            
-            # 對於NPZ文件中的離散代碼等，限制特徵維度以避免過大
-            max_feature_dim = self.feature_config.get('max_feature_dim', 10000)
-            if len(features) > max_feature_dim:
-                logger.warning(f"特徵維度 {len(features)} 超過限制 {max_feature_dim}，進行截斷")
-                features = features[:max_feature_dim]
-            
-            # 標準化特徵
-            if self.normalize and self.scaler is not None:
-                try:
-                    features = self.scaler.transform(features.reshape(1, -1)).flatten()
-                except ValueError as e:
-                    logger.warning(f"標準化特徵失敗: {str(e)}，使用未標準化的特徵")
-            
-            # 緩存特徵
-            if self.cache_features:
-                self.feature_cache[idx] = features
-                
-            return features
-            
-        except Exception as e:
-            logger.error(f"加載特徵 {feature_path} 失敗: {str(e)}")
-            return np.array([])
-            
-    def __len__(self) -> int:
-        """獲取數據集長度
-        
-        Returns:
-            int: 數據集長度
-        """
-        return len(self.samples)
-        
-    def __getitem__(self, idx: int) -> Dict[str, Any]:
-        """獲取指定索引的樣本
-        
-        Args:
-            idx (int): 樣本索引
-            
-        Returns:
-            Dict[str, Any]: 樣本字典，包含 'features', 'label', 'score' 等
-        """
-        sample = self.samples[idx]
-        
-        # 加載特徵
-        features = self._load_features(idx)
-        
-        # 將特徵轉換為張量
-        if features is None or len(features) == 0:
-            # 如果特徵加載失敗，使用零向量代替
-            features = np.zeros(len(self.feature_names) if self.feature_names else 10)
-            
-        features_tensor = torch.FloatTensor(features)
-        
-        # 獲取標籤
-        label = sample.get('label', None)
-        score = sample.get('score', -1)
-        
-        # 創建輸出字典
-        output = {
-            'features': features_tensor,
-            'patient_id': sample['patient_id']
-        }
-        
-        # 確保同時提供 label 和 score，無論是分類還是回歸任務
-        if label is not None:
-            output['label'] = label
-            # 如果沒有明確的分數，也將標籤用作分數
-            if score == -1:
-                output['score'] = label
-            else:
-                output['score'] = torch.tensor(score, dtype=torch.float32)
-        else:
-            # 對於回歸任務，score 被用作標籤
-            score_tensor = torch.tensor(score, dtype=torch.float32)
-            output['score'] = score_tensor
-            output['label'] = score_tensor  # 同時設置為 label，確保兼容性
-        
-        return output
-        
-    def split_by_patient(
-        self,
-        train_ratio: float = 0.7,
-        val_ratio: float = 0.15,
-        test_ratio: float = 0.15,
-        seed: int = 42
-    ) -> Tuple[List[int], List[int], List[int]]:
-        """按患者ID拆分數據集
-        
-        Args:
-            train_ratio (float, optional): 訓練集比例. 預設為 0.7.
-            val_ratio (float, optional): 驗證集比例. 預設為 0.15.
-            test_ratio (float, optional): 測試集比例. 預設為 0.15.
-            seed (int, optional): 隨機種子. 預設為 42.
-            
-        Returns:
-            Tuple[List[int], List[int], List[int]]: 訓練、驗證和測試樣本的索引
-        """
-        # 設置隨機種子
-        random.seed(seed)
-        
-        # 獲取唯一的患者ID
-        patient_ids = list(set(sample['patient_id'] for sample in self.samples))
-        
-        # 打亂患者ID
-        random.shuffle(patient_ids)
-        
-        # 計算分割點
-        train_size = int(len(patient_ids) * train_ratio)
-        val_size = int(len(patient_ids) * val_ratio)
-        
-        # 分割患者ID
-        train_patients = patient_ids[:train_size]
-        val_patients = patient_ids[train_size:train_size + val_size]
-        test_patients = patient_ids[train_size + val_size:]
-        
-        # 按患者ID分組樣本索引
-        train_indices = []
-        val_indices = []
-        test_indices = []
-        
-        for i, sample in enumerate(self.samples):
-            patient_id = sample['patient_id']
-            
-            if patient_id in train_patients:
-                train_indices.append(i)
-            elif patient_id in val_patients:
-                val_indices.append(i)
-            elif patient_id in test_patients:
-                test_indices.append(i)
-                
-        return train_indices, val_indices, test_indices
-        
-    def get_feature_dim(self) -> int:
-        """獲取特徵維度
-        
-        Returns:
-            int: 特徵維度
-        """
-        # 加載第一個樣本以確定特徵維度
-        if len(self.samples) > 0:
-            features = self._load_features(0)
-            if features is not None:
-                return len(features)
-                
-        # 如果沒有樣本或加載失敗，返回默認值
-        return len(self.feature_names) if self.feature_names else 0 
+        # 獲取樣本
+        if not hasattr(self, 'samples') or len(self.samples) <= idx:
+            logger.error(f"無法加載索引 {idx} 的特徵，samples不存在或索引超出範圍")
+            return np.zeros(10)  # 返回默認值
 
-    def _load_npz_feature(self, file_path: str) -> np.ndarray:
-        """加載NPZ格式的特徵文件
+        sample = self.samples[idx]
         
-        Args:
-            file_path: NPZ文件路徑
-            
-        Returns:
-            np.ndarray: 特徵數組
-        """
-        try:
-            data = np.load(file_path, allow_pickle=True)
-            
-            # 優先從'features'鍵獲取特徵
-            if 'features' in data:
-                features = data['features']
-                if isinstance(features, np.ndarray):
-                    return features
-            
-            # 否則嘗試提取所有非元數據字段
-            feature_arrays = []
-            for key in data.keys():
-                if key != 'metadata':
-                    arr = data[key]
-                    if isinstance(arr, np.ndarray):
-                        feature_arrays.append(arr)
-            
-            if feature_arrays:
-                # 如果有多個特徵數組，連接它們
-                return np.concatenate(feature_arrays, axis=0)
-            
-            raise ValueError(f"NPZ文件 {file_path} 中找不到有效的特徵數據")
-            
-        except Exception as e:
-            raise ValueError(f"無法加載NPZ文件 {file_path}: {str(e)}")
-    
-    def _load_json_feature(self, file_path: str) -> np.ndarray:
-        """加載JSON格式的特徵文件
+        # 索引模式使用load_data方法
+        if not self.is_direct_mode:
+            try:
+                # 從load_data方法獲取特徵張量
+                features_tensor = self.load_data(sample)
+                
+                # 確保張量是一維的
+                if features_tensor.dim() > 1:
+                    features_tensor = features_tensor.flatten()
+                
+                # 轉換為numpy數組並返回
+                return features_tensor.numpy()
+            except Exception as e:
+                logger.error(f"索引模式下加載特徵失敗，錯誤: {str(e)}")
+                return np.zeros(self._infer_feature_dim())  # 返回默認值
         
-        Args:
-            file_path: JSON文件路徑
+        # 直接模式
+        feature_path = sample.get('feature_path')
+        
+        if not feature_path or not os.path.exists(feature_path):
+            logger.warning(f"特徵文件 {feature_path} 不存在")
+            return np.zeros(10)  # 返回默認值
             
-        Returns:
-            np.ndarray: 特徵數組
-        """
+        # 根據文件類型選擇適當的加載方法
+        ext = os.path.splitext(feature_path)[1].lower()
+        
         try:
-            with open(file_path, 'r') as f:
-                data = json.load(f)
-            
-            # 如果是字典，尋找特徵字段
-            if isinstance(data, dict):
-                # 優先使用配置中指定的特徵名
-                if self.feature_names:
-                    features = []
-                    for name in self.feature_names:
-                        if name in data:
-                            features.extend(data[name])
-                    
-                    if features:
-                        return np.array(features, dtype=np.float32)
+            if ext == '.npz':
+                return self._load_npz_feature(feature_path)
+            elif ext == '.npy':
+                return self._load_npy_feature(feature_path)
+            elif ext == '.json':
+                return self._load_json_feature(feature_path)
+            elif ext == '.csv':
+                return self._load_csv_feature(feature_path)
+            else:
+                logger.warning(f"未知的特徵文件擴展名: {ext}")
+                return np.zeros(10)  # 返回默認值
                 
-                # 否則嘗試找到features字段
-                if 'features' in data:
-                    features = data['features']
-                    if isinstance(features, list):
-                        return np.array(features, dtype=np.float32)
-                
-                # 否則嘗試提取所有數值字段
-                features = []
-                for key, value in data.items():
-                    if isinstance(value, (list, np.ndarray)) and key != 'metadata':
-                        features.extend(value)
-                
-                if features:
-                    return np.array(features, dtype=np.float32)
-            
-            # 如果是列表，直接使用
-            elif isinstance(data, list):
-                return np.array(data, dtype=np.float32)
-            
-            raise ValueError(f"JSON文件 {file_path} 中找不到有效的特徵數據")
-            
         except Exception as e:
             raise ValueError(f"無法加載JSON文件 {file_path}: {str(e)}")
     
@@ -1158,6 +1157,299 @@ class FeatureDataset(IndexedDatasetBase):
             
         except Exception as e:
             raise ValueError(f"無法加載CSV文件 {file_path}: {str(e)}")
+    
+    def _scan_max_feature_length(self) -> int:
+        """掃描數據集中所有特徵的最大長度
+        
+        在使用置中填充模式時，需要提前知道最大特徵長度，以便正確填充
+        
+        Returns:
+            int: 數據集中特徵向量的最大長度
+        """
+        max_length = 0
+        scanned_count = 0
+        error_count = 0
+        
+        logger.info(f"開始掃描特徵最大長度，共有 {len(self.samples)} 個樣本")
+        
+        # 限制掃描的最大樣本數，避免過長時間
+        max_scan_samples = min(len(self.samples), 1000)  # 最多掃描1000個樣本
+        
+        for i, sample in enumerate(self.samples[:max_scan_samples]):
+            try:
+                # 使用features_path欄位（如果有）
+                if 'features_path' in sample and os.path.exists(sample['features_path']):
+                    features = self._load_feature_by_path_raw(sample['features_path'])
+                    if features is not None:
+                        feature_length = len(features)
+                        max_length = max(max_length, feature_length)
+                        scanned_count += 1
+                
+                # 或嘗試加載file_path中的特徵文件
+                elif 'file_path' in sample:
+                    file_path = sample['file_path']
+                    if os.path.isdir(file_path):
+                        # 查找特徵文件
+                        dir_name = os.path.basename(file_path)
+                        feature_path = os.path.join(file_path, f"{dir_name}_features.npy")
+                        
+                        if os.path.exists(feature_path):
+                            features = self._load_feature_by_path_raw(feature_path)
+                            if features is not None:
+                                feature_length = len(features)
+                                max_length = max(max_length, feature_length)
+                                scanned_count += 1
+                
+                # 每100個樣本打印一次進度
+                if (i+1) % 100 == 0:
+                    logger.info(f"已掃描 {i+1}/{len(self.samples[:max_scan_samples])} 個樣本，當前最大長度: {max_length}")
+            
+            except Exception as e:
+                error_count += 1
+                if error_count <= 5:  # 只打印前5個錯誤
+                    logger.warning(f"掃描特徵長度時出錯: {str(e)}")
+                continue
+        
+        # 如果沒有成功掃描到特徵，使用配置中的max_feature_dim
+        if max_length == 0:
+            max_length = self.max_feature_dim
+            logger.warning(f"未能掃描到任何有效特徵，使用配置中的max_feature_dim: {max_length}")
+        
+        logger.info(f"特徵長度掃描完成，成功掃描 {scanned_count} 個樣本，最大長度: {max_length}")
+        return max_length
+    
+    def _load_feature_by_path_raw(self, file_path: str) -> np.ndarray:
+        """原始加載特徵文件，不進行任何裁剪或填充
+        
+        用於掃描特徵長度時加載原始特徵
+        
+        Args:
+            file_path: 特徵文件路徑
+            
+        Returns:
+            np.ndarray: 原始特徵數組
+        """
+        # 根據擴展名判斷文件類型
+        ext = os.path.splitext(file_path)[1].lower()
+        
+        try:
+            if ext == '.npz':
+                data = np.load(file_path, allow_pickle=True)
+                if 'features' in data:
+                    return data['features']
+                return next((data[k] for k in data.keys() if k != 'metadata'), np.array([]))
+                
+            elif ext == '.npy':
+                features = np.load(file_path)
+                if features.ndim > 1:
+                    features = features.flatten()
+                return features
+                
+            elif ext == '.json':
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    return np.array(list(data.values()))
+                elif isinstance(data, list) and len(data) > 0:
+                    return np.array(data)
+                return np.array([])
+                
+            elif ext == '.csv':
+                df = pd.read_csv(file_path)
+                exclude_cols = [self.patient_id_column, self.label_name]
+                feature_cols = [col for col in df.columns if col not in exclude_cols]
+                if feature_cols:
+                    return df[feature_cols].values.flatten()
+                return np.array([])
+            
+            else:
+                return np.array([])
+        
+        except Exception as e:
+            logger.debug(f"加載原始特徵失敗 {file_path}: {str(e)}")
+            return np.array([])
+    
+    def _center_pad_features(self, features: np.ndarray, target_length: int) -> np.ndarray:
+        """將特徵向量置中並填充至目標長度
+        
+        Args:
+            features: 特徵向量 (numpy array)
+            target_length: 目標長度
+            
+        Returns:
+            numpy array: 置中填充後的特徵向量
+        """
+        current_length = len(features)
+        
+        # 如果當前長度已達到或超過目標長度，則居中截斷
+        if current_length >= target_length:
+            start = (current_length - target_length) // 2
+            return features[start:start+target_length]
+        
+        # 計算需要填充的總長度
+        padding = target_length - current_length
+        
+        # 計算左右填充量
+        left_pad = padding // 2
+        right_pad = padding - left_pad
+        
+        # 創建結果數組並填充
+        result = np.zeros(target_length, dtype=features.dtype)
+        result[left_pad:left_pad+current_length] = features
+        
+        return result
+    
+    def _init_pca(self):
+        """初始化PCA模型
+        
+        在訓練模式下收集樣本並訓練PCA模型，用於降維
+        """
+        logger.info("初始化PCA模型...")
+        
+        # 檢查是否有樣本
+        if not hasattr(self, 'samples') or not self.samples:
+            logger.warning("沒有樣本可用於初始化PCA模型")
+            return
+        
+        try:
+            # 收集特徵向量用於訓練PCA
+            features_list = []
+            max_samples = min(len(self.samples), 500)  # 增加訓練樣本數量，限制在500個
+            processed_count = 0
+            
+            logger.info(f"收集訓練PCA的樣本數據 (最多{max_samples}個樣本)...")
+            
+            # 首先掃描特徵長度，確保能夠對齊
+            max_feature_length = 0
+            raw_features = []
+            feature_paths = []
+            
+            # 掃描最大特徵長度
+            for i in range(min(max_samples, len(self.samples))):
+                try:
+                    # 加載原始特徵（不經過PCA處理）
+                    feature_path = None
+                    if 'features_path' in self.samples[i] and os.path.exists(self.samples[i]['features_path']):
+                        feature_path = self.samples[i]['features_path']
+                    elif 'file_path' in self.samples[i]:
+                        file_path = self.samples[i]['file_path']
+                        if os.path.isdir(file_path):
+                            # 尋找特徵文件
+                            dir_name = os.path.basename(file_path)
+                            possible_feature_path = os.path.join(file_path, f"{dir_name}_features.npy")
+                            if os.path.exists(possible_feature_path):
+                                feature_path = possible_feature_path
+                    
+                    if feature_path:
+                        # 加載原始特徵
+                        features = self._load_feature_by_path_raw(feature_path)
+                        if features is not None and len(features) > 0:
+                            # 記錄原始特徵和路徑
+                            raw_features.append(features)
+                            feature_paths.append(feature_path)
+                            max_feature_length = max(max_feature_length, len(features))
+                            processed_count += 1
+                            
+                            # 每50個樣本打印一次進度
+                            if processed_count % 50 == 0:
+                                logger.info(f"已掃描 {processed_count}/{max_samples} 個樣本")
+                
+                except Exception as e:
+                    logger.warning(f"掃描樣本 {i} 特徵長度時出錯: {str(e)}")
+                    continue
+            
+            if not raw_features:
+                logger.warning("無法加載任何特徵樣本，跳過初始化PCA模型")
+                return
+                
+            logger.info(f"掃描完成，共找到 {len(raw_features)} 個有效樣本，最大特徵長度: {max_feature_length}")
+            
+            # 對齊所有特徵長度
+            aligned_features = []
+            for i, feat in enumerate(raw_features):
+                if self.padding_mode == 'center':
+                    # 使用置中填充
+                    aligned_feat = self._center_pad_features(feat, max_feature_length)
+                else:
+                    # 使用右側填充
+                    aligned_feat = np.zeros(max_feature_length)
+                    aligned_feat[:len(feat)] = feat
+                
+                aligned_features.append(aligned_feat)
+                
+                # 每50個樣本打印一次進度
+                if (i+1) % 50 == 0:
+                    logger.info(f"已對齊 {i+1}/{len(raw_features)} 個樣本")
+            
+            # 將特徵列表轉換為二維數組，每行一個樣本
+            features_array = np.vstack(aligned_features)
+            logger.info(f"成功收集並對齊了 {features_array.shape[0]} 個樣本，每個樣本維度為 {features_array.shape[1]}")
+            
+            # 調整目標維度，確保不超過樣本數量
+            n_samples, n_features = features_array.shape
+            max_components = min(n_samples, n_features)
+            target_dim = min(self.target_dim, max_components)
+            
+            if target_dim < self.target_dim:
+                logger.warning(f"由於樣本數量限制，PCA目標維度從 {self.target_dim} 調整為 {target_dim}")
+            
+            # 初始化並訓練PCA模型
+            self.pca = PCA(n_components=target_dim)
+            self.pca.fit(features_array)
+            
+            # 計算解釋方差
+            explained_variance = sum(self.pca.explained_variance_ratio_) * 100
+            logger.info(f"PCA模型初始化完成，{target_dim}個主成分解釋了{explained_variance:.2f}%的方差")
+            
+        except Exception as e:
+            logger.error(f"初始化PCA模型失敗: {str(e)}")
+            self.pca = None
+    
+    def _apply_pca(self, features):
+        """應用PCA降維到特徵向量
+        
+        Args:
+            features: 原始特徵向量
+            
+        Returns:
+            np.ndarray: 降維後的特徵向量
+        """
+        if self.pca is None:
+            logger.warning("PCA模型未初始化，跳過降維")
+            # 如果PCA未初始化，則使用截斷方式處理
+            return features[:self.target_dim] if len(features) > self.target_dim else features
+        
+        try:
+            # 需要確保特徵長度與訓練PCA時一致
+            feature_length = len(features)
+            expected_length = self.pca.n_features_in_
+            
+            # 如果特徵長度不符合PCA期望長度，首先對齊特徵長度
+            if feature_length != expected_length:
+                logger.debug(f"特徵長度 ({feature_length}) 與PCA期望長度 ({expected_length}) 不一致，進行對齊")
+                
+                if self.padding_mode == 'center':
+                    # 使用置中填充
+                    features = self._center_pad_features(features, expected_length)
+                else:
+                    # 使用右側填充
+                    aligned_features = np.zeros(expected_length)
+                    aligned_features[:feature_length] = features
+                    features = aligned_features
+            
+            # 確保特徵是二維的 (PCA需要的格式)
+            features_reshaped = features.reshape(1, -1)
+            
+            # 應用PCA轉換
+            transformed = self.pca.transform(features_reshaped)
+            
+            # 返回一維數組
+            return transformed.flatten()
+            
+        except Exception as e:
+            logger.error(f"應用PCA降維失敗: {str(e)}")
+            # 失敗時使用截斷作為備選方案
+            return features[:self.target_dim] if len(features) > self.target_dim else features
 
 # 中文註解：這是feature_dataset.py的Minimal Executable Unit，檢查能否正確初始化與錯誤路徑時的優雅報錯
 if __name__ == "__main__":

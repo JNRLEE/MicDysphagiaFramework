@@ -240,20 +240,55 @@ tensorboard --logdir outputs/
 tensorboard --logdir_spec=exp1:outputs/experiment1,exp2:outputs/experiment2
 ```
 
+### 標籤欄位選擇
+
+MicDysphagiaFramework 支援使用多種標籤欄位進行模型訓練。這些標籤欄位存儲在 `data/metadata/data_index.csv` 文件中，可以通過配置文件選擇不同的標籤欄位：
+
+1. **可用的標籤欄位**：
+
+   | 標籤欄位 | 類型 | 類別數量 | 說明 |
+   |---------|------|---------|------|
+   | `score` | 回歸 | 1 (輸出) | EAT-10問卷得分，範圍0-40的整數值 |
+   | `DrLee_Evaluation` | 分類 | 3 | Dr. Lee對每筆資料的分類 |
+   | `DrTai_Evaluation` | 分類 | 4 | Dr. Tai對每筆資料的分類 |
+   | `selection` | 分類 | 9+ | 錄音時的動作類型 |
+
+2. **在配置文件中設置標籤欄位**：
+   ```yaml
+   data:
+     use_index: true
+     index_path: 'data/metadata/data_index.csv'
+     label_field: 'DrLee_Evaluation'  # 選擇標籤欄位
+   ```
+
+3. **自動類別數量設置**：
+   
+   框架支援自動設置模型輸出類別數量。當使用 `scripts/run_experiments.py` 運行實驗時，系統會自動從數據集中獲取類別數量，並更新模型配置。
+
+4. **示例配置文件**：
+   - `config/example_classification_indexed.yaml` - 使用 DrLee_Evaluation (3類)
+   - `config/example_classification_drtai.yaml` - 使用 DrTai_Evaluation (4類)
+   - `config/example_classification_selection.yaml` - 使用 selection (9類+)
+   - `config/example_regression_score.yaml` - 使用 score 進行回歸任務
+
+更多詳細信息，請參閱 [標籤欄位使用指南](docs/indexed_dataset_labels.md)。
+
 ## 目錄結構
 
 ```
 MicDysphagiaFramework/
 ├── config/                      # 配置文件目錄
 │   ├── config_schema.yaml       # 配置模式定義
-│   ├── audio_swin_regression.yaml  # 音頻 Swin 回歸模型配置
-│   └── audio_swin_classification.yaml  # 音頻 Swin 分類模型配置
+│   ├── example_eat10_regression.yaml  # EAT-10 回歸示例配置
+│   └── example_classification.yaml    # 分類示例配置
 │
 ├── data/                        # 數據處理模塊
 │   ├── dataset_factory.py       # 數據集工廠
 │   ├── audio_dataset.py         # 音頻數據集
 │   ├── spectrogram_dataset.py   # 頻譜圖數據集
-│   └── feature_dataset.py       # 特徵數據集
+│   ├── feature_dataset.py       # 特徵數據集
+│   ├── indexed_dataset.py       # 索引數據集
+│   └── metadata/                # 元數據目錄
 │
 ├── models/                      # 模型定義
 │   ├── model_factory.py         # 模型工廠
@@ -271,9 +306,7 @@ MicDysphagiaFramework/
 ├── tests/                       # 功能測試
 │   ├── test_model_data_bridging.py  # 模型數據橋接測試
 │   ├── model_data_bridging_report.json # 兼容性測試報告
-│   ├── test_callback_interface.py   # 回調接口測試
-│   ├── dataloader_test/         # 數據加載器測試數據
-│   └── loss_tests/              # 損失函數測試
+│   └── test_callback_interface.py   # 回調接口測試
 │
 ├── losses/                      # 損失函數
 │   ├── loss_factory.py          # 損失函數工廠
@@ -284,33 +317,34 @@ MicDysphagiaFramework/
 ├── utils/                       # 工具函數
 │   ├── config_loader.py         # 配置加載器
 │   ├── data_adapter.py          # 數據適配器
-│   ├── logging_utils.py         # 日誌工具
-│   ├── metrics.py               # 評估指標
 │   ├── save_manager.py          # 存檔管理器
-│   └── callback_interface.py    # 回調接口定義
-│
-├── visualization/               # 可視化模塊
-│   ├── visualize_results.py     # 結果可視化
-│   ├── tsne_visualizer.py       # t-SNE 可視化
-│   └── confusion_matrix.py      # 混淆矩陣可視化
-│
-├── docs/                        # 文檔
-│   ├── model_data_compatibility.md  # 模型與數據兼容性文檔
-│   ├── losses.md                # 損失函數設計與使用文檔
-│   └── ranking_losses.md        # 排序損失函數數學原理與應用場景
+│   ├── callback_interface.py    # 回調接口定義
+│   ├── constants.py             # 常量定義
+│   ├── data_index_loader.py     # 數據索引加載器
+│   ├── patient_info_loader.py   # 患者信息加載器
+│   └── audio_feature_extractor.py # 音頻特徵提取器
 │
 ├── scripts/                     # 腳本
 │   ├── run_experiments.py       # 運行實驗腳本
-│   ├── prepare_spectrograms.py  # 頻譜圖預處理
-│   └── extract_features.py      # 特徵提取
+│   └── filter_data_by_selection.py # 按選擇過濾數據
 │
 ├── results/                     # 實驗結果目錄
-│   ├── experiment1_timestamp/   # 實驗結果子目錄
-│   ├── experiment2_timestamp/   # 實驗結果子目錄
-│   └── frame_data_structure.md        # 數據結構說明文檔
+│   └── experiment/              # 實驗結果子目錄
 │
-├── main.py                      # 主程序
+├── outputs/                     # 模型輸出目錄
+│
+├── checkpoints/                 # 模型檢查點目錄
+│
+├── legacy/                      # 舊代碼存儲目錄
+│
+├── docs/                        # 文檔
+│
 ├── requirements.txt             # 依賴列表
+├── setup_conda_env.sh           # Linux/macOS 環境設置腳本
+├── setup_conda_env.bat          # Windows 環境設置腳本
+├── Dockerfile                   # Docker 配置文件
+├── docker-instructions.md       # Docker 使用指南
+├── LINUX_SETUP.md               # Linux 設置指南
 └── README.md                    # 說明文件
 ```
 
@@ -512,6 +546,49 @@ model:
 ```
 
 完整示例請參考 `config/audio_swin_regression.yaml` 和 `config/audio_swin_classification.yaml`。
+
+## 索引數據集功能
+
+MicDysphagiaFramework 現已支援基於索引CSV的數據集加載功能，提供更靈活的標籤選擇和數據篩選能力。
+
+### 主要特性
+
+- **靈活的標籤選擇**：可以輕鬆切換使用不同類型的標籤（EAT-10 分數、醫生評估等）
+- **強大的數據篩選**：可根據患者ID、動作類型、處理狀態等條件篩選數據
+- **標準化數據管理**：所有數據元信息統一管理，提高數據的可追蹤性
+- **按患者ID分割數據**：避免同一患者的數據同時出現在訓練集和測試集中
+- **退化機制**：索引不可用時可自動退化到傳統模式，確保穩定性
+
+### 快速開始
+
+1. **使用索引模式的配置文件**：
+   
+   ```yaml
+   data:
+     source:
+       use_index: true
+       index_path: "data/metadata/data_index.csv"
+       label_column: "DrTai_Evaluation"  # 使用醫生評估作為標籤
+       label_mapping:                    # 標籤映射
+         "正常": 0
+         "無OR 輕微吞嚥障礙": 1
+         "重度吞嚥障礙": 2
+         "吞嚥障礙": 2
+       filters:                          # 數據篩選
+         status: "processed"
+         selection: ["乾吞嚥1口", "乾吞嚥2口"]
+   ```
+
+2. **執行訓練**：
+
+   ```bash
+   python main.py --config config/example_classification_indexed.yaml
+   ```
+
+### 詳細文檔
+
+- 完整的索引數據集使用指南請參考 [docs/indexed_dataset_guide.md](docs/indexed_dataset_guide.md)
+- 不同配置文件的比較指南請參考 [docs/config_comparison.md](docs/config_comparison.md)
 
 ## 擴展框架
 

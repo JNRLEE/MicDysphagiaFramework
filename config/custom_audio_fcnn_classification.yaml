@@ -101,7 +101,7 @@ model:
     batch_norm: true
 
 training:
-  epochs: 200
+  epochs: 3  # Modified to 3 epochs for quick testing
   save_every: 5
   early_stopping:
     enabled: true

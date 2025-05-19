@@ -28,12 +28,26 @@
    - 支持按患者ID拆分數據集，確保相同患者的數據不會同時出現在訓練和測試集
 """
 
+# 從各子模組導入類和函數
+from .dataset_factory import create_dataset
 from .audio_dataset import AudioDataset
-from .feature_dataset import FeatureDataset
 from .spectrogram_dataset import SpectrogramDataset
+from .feature_dataset import FeatureDataset
+from .indexed_dataset import IndexedDatasetBase
 
 __all__ = [
-    'AudioDataset', 
-    'FeatureDataset', 
-    'SpectrogramDataset'
+    # 數據集工廠
+    'create_dataset',
+    
+    # 音頻數據集
+    'AudioDataset',
+    
+    # 頻譜圖數據集
+    'SpectrogramDataset',
+    
+    # 特徵數據集
+    'FeatureDataset',
+    
+    # 索引數據集
+    'IndexedDatasetBase'
 ] 

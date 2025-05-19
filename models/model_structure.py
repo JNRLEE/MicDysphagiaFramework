@@ -58,6 +58,61 @@ class ModelStructureInfo:
             
         return self.structure_info
     
+    def to_dict(self) -> Dict[str, Any]:
+        """獲取模型結構信息字典
+        
+        Returns:
+            Dict[str, Any]: 模型結構信息字典，包括模型摘要和層信息
+            
+        Description:
+            這個方法與 get_structure_dict 相似，但它專門設計為符合 framework_data_structure.md
+            中定義的模型結構信息格式，方便與分析工具的整合。
+        """
+        if self.structure_info is None and self.model is not None:
+            self.extract_structure()
+            
+        if self.structure_info is None:
+            raise ValueError("未提取結構信息，請先調用 extract_structure() 方法")
+        
+        # 構建符合 framework_data_structure.md 格式的字典
+        model_dict = {
+            "model_summary": str(self.model),
+            "total_parameters": self.structure_info['total_parameters'],
+            "layer_info": []
+        }
+        
+        # 添加層信息
+        for layer in self.structure_info['layers']:
+            # 跳過子層，只包含主要層
+            if len(layer['name'].split('.')) <= 2:  # 限制嵌套深度
+                layer_info = {
+                    "name": layer['name'],
+                    "type": layer['type'],
+                    "parameters": layer['parameters']
+                }
+                
+                # 如果有形狀信息，添加它
+                shape = self._get_layer_output_shape(layer['name'])
+                if shape:
+                    layer_info["shape"] = shape
+                    
+                model_dict["layer_info"].append(layer_info)
+        
+        return model_dict
+    
+    def _get_layer_output_shape(self, layer_name: str) -> Optional[List[int]]:
+        """獲取層的輸出形狀
+        
+        Args:
+            layer_name: 層名稱
+            
+        Returns:
+            Optional[List[int]]: 層的輸出形狀，如果無法確定則返回 None
+        """
+        # 這個方法需要知道輸入形狀和前向傳播，在靜態分析中有限制
+        # 未來可以通過運行一次前向傳播來獲取
+        return None
+    
     @staticmethod
     def extract_structure_info(model: nn.Module, model_type: str = None) -> Dict[str, Any]:
         """從模型中提取結構信息

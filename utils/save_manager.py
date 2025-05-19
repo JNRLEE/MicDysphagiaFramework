@@ -46,7 +46,9 @@ class SaveManager:
                 'hooks': os.path.join(self.experiment_dir, 'hooks'),
                 'logs': os.path.join(self.experiment_dir, 'logs'),
                 'tensorboard': os.path.join(self.experiment_dir, 'tensorboard_logs'),
-                'results': os.path.join(self.experiment_dir, 'results')
+                'results': os.path.join(self.experiment_dir, 'results'),
+                'datasets': os.path.join(self.experiment_dir, 'datasets'),
+                'feature_vectors': os.path.join(self.experiment_dir, 'feature_vectors')
             }
             
             for name, path in self.subdirs.items():
@@ -488,70 +490,32 @@ class SaveManager:
         Returns:
             str: 保存的文件路徑
         """
-        save_path = self.get_path('results', 'training_summary.json')
+        # 將保存路徑更改為 hooks 子目錄，並將文件名更改為 training_summary.pt
+        save_path = self.get_path('hooks', 'training_summary.pt') 
         
-        # 準備要保存的數據 (確保所有數據都是可序列化的)
-        history_serializable = {}
-        for key, value in history.items():
-            # 如果是字典，需要遞歸處理
-            if isinstance(value, dict):
-                history_serializable[key] = {}
-                for k, v in value.items():
-                    if isinstance(v, list):
-                        # 處理列表中的張量
-                        history_serializable[key][k] = []
-                        for item in v:
-                            if hasattr(item, 'item') and callable(item.item):  # 判斷是否為 tensor
-                                try:
-                                    history_serializable[key][k].append(item.item())
-                                except:
-                                    # 如果是多元素張量，使用均值
-                                    history_serializable[key][k].append(float(item.mean().item()) if hasattr(item, 'mean') else None)
-                            else:
-                                history_serializable[key][k].append(item)
-                    else:
-                        # 非列表數據
-                        if hasattr(v, 'item') and callable(v.item):  # 判斷是否為 tensor
-                            try:
-                                history_serializable[key][k] = v.item()
-                            except:
-                                # 如果是多元素張量，使用均值
-                                history_serializable[key][k] = float(v.mean().item()) if hasattr(v, 'mean') else None
-                        else:
-                            history_serializable[key][k] = v
-            elif isinstance(value, list):
-                # 處理一級列表中的張量
-                history_serializable[key] = []
-                for item in value:
-                    if hasattr(item, 'item') and callable(item.item):  # 判斷是否為 tensor
-                        try:
-                            history_serializable[key].append(item.item())
-                        except:
-                            # 如果是多元素張量，使用均值
-                            history_serializable[key].append(float(item.mean().item()) if hasattr(item, 'mean') else None)
-                    else:
-                        history_serializable[key].append(item)
-            else:
-                # 處理一級非列表數據
-                if hasattr(value, 'item') and callable(value.item):  # 判斷是否為 tensor
-                    try:
-                        history_serializable[key] = value.item()
-                    except:
-                        # 如果是多元素張量，使用均值
-                        history_serializable[key] = float(value.mean().item()) if hasattr(value, 'mean') else None
-                else:
-                    history_serializable[key] = value
-        
-        summary = {
+        # 準備要保存的數據 (確保所有數據都是可序列化的，儘管對於 torch.save 這不那麼嚴格)
+        # 原始的 history 數據結構可能已經適合 torch.save
+        summary_data = {
+            'history': history, # 直接保存 history dict
             'total_epochs': total_epochs,
-            'history': history_serializable,
             'timestamp': datetime.now().isoformat()
         }
         
-        with open(save_path, 'w') as f:
-            json.dump(summary, f, indent=2)
-            
-        logger.info(f"訓練摘要已保存到: {save_path}")
+        try:
+            torch.save(summary_data, save_path)
+            logger.info(f"訓練摘要已保存到: {save_path}")
+        except Exception as e:
+            logger.error(f"保存訓練摘要到 {save_path} 時出錯: {e}", exc_info=True)
+            # 如果 torch.save 失敗，可以考慮回退到JSON，但需要確保 history 可序列化
+            # 此處為簡化，僅記錄錯誤
+            # save_path_json = self.get_path('hooks', 'training_summary_error.json')
+            # try:
+            #     with open(save_path_json, 'w') as f_json:
+            #         json.dump(summary_data, f_json, indent=2, default=str) # 添加 default=str 以處理無法序列化的類型
+            #     logger.warning(f"由於torch.save失敗，訓練摘要已嘗試保存為JSON到: {save_path_json}")
+            # except Exception as e_json:
+            #     logger.error(f"嘗試將訓練摘要保存為JSON也失敗: {e_json}")
+            return ""
         return save_path
     
     def save_evaluation_results(self, results: Dict[str, Any], mode: Optional[str] = None) -> str:
@@ -636,6 +600,272 @@ class SaveManager:
         with open(save_path, 'w') as f:
             json.dump(gns_stats, f, indent=2)
         logger.info(f"GNS 統計量已保存到: {save_path}")
+        return save_path
+        
+    def save_dataset_info(self, dataset_type: str, dataset: Any, config: Dict[str, Any] = None, 
+                          file_paths: List[str] = None) -> str:
+        """保存資料集資訊
+        
+        Args:
+            dataset_type: 資料集類型 ('train', 'val', 'test')
+            dataset: 資料集物件
+            config: 配置字典，包含資料集相關設定
+            file_paths: 資料集中使用的檔案路徑列表
+            
+        Returns:
+            str: 保存的文件路徑
+            
+        Description:
+            保存資料集的詳細資訊，包括大小、分布統計、分割方式、預處理參數和檔案路徑
+            
+        References:
+            無
+        """
+        # 創建 datasets 子目錄
+        datasets_dir = os.path.join(self.experiment_dir, 'datasets')
+        os.makedirs(datasets_dir, exist_ok=True)
+        
+        # 準備資料集資訊
+        dataset_info = {
+            'type': dataset_type,
+            'size': len(dataset),
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # 添加配置資訊（如果有）
+        if config:
+            # 提取資料集相關的配置
+            data_config = config.get('data', {})
+            dataset_info['config'] = {
+                'type': data_config.get('type', 'unknown'),
+                'splits': data_config.get('splits', {}),
+                'preprocessing': data_config.get('preprocessing', {}),
+                'transforms': data_config.get('transforms', {}).get(dataset_type, {})
+            }
+        
+        # 嘗試獲取更多資料集資訊
+        try:
+            # 類別分布（如果是分類任務）
+            if hasattr(dataset, 'get_class_distribution'):
+                dataset_info['class_distribution'] = dataset.get_class_distribution()
+            elif hasattr(dataset, 'class_counts'):
+                dataset_info['class_distribution'] = dataset.class_counts
+            else:
+                # 嘗試手動計算類別分布
+                try:
+                    labels = []
+                    for i in range(min(len(dataset), 1000)):  # 最多取1000個樣本避免過大
+                        sample = dataset[i]
+                        if isinstance(sample, dict) and 'label' in sample:
+                            labels.append(sample['label'])
+                        elif isinstance(sample, tuple) and len(sample) > 1:
+                            labels.append(sample[1])
+                    
+                    if labels:
+                        if isinstance(labels[0], torch.Tensor):
+                            labels = [label.item() if label.numel() == 1 else label.tolist() for label in labels]
+                        
+                        # 計算類別計數
+                        from collections import Counter
+                        class_counts = Counter(labels)
+                        dataset_info['class_distribution'] = {str(k): v for k, v in class_counts.items()}
+                except Exception as e:
+                    logger.warning(f"計算類別分布時出錯: {e}")
+            
+            # 特徵維度（如果適用）
+            if hasattr(dataset, 'get_feature_dim'):
+                dataset_info['feature_dim'] = dataset.get_feature_dim()
+            elif hasattr(dataset, 'feature_dim'):
+                dataset_info['feature_dim'] = dataset.feature_dim
+                
+            # 樣本資訊（如果有患者ID）
+            if hasattr(dataset, 'samples') and isinstance(dataset.samples, list):
+                # 提取樣本摘要資訊（避免過大）
+                sample_summary = []
+                for i, sample in enumerate(dataset.samples[:100]):  # 最多取100個樣本
+                    if isinstance(sample, dict):
+                        # 過濾掉大型資料欄位
+                        filtered_sample = {k: v for k, v in sample.items() 
+                                          if not isinstance(v, (np.ndarray, torch.Tensor)) or 
+                                          (isinstance(v, (np.ndarray, torch.Tensor)) and v.size < 100)}
+                        sample_summary.append(filtered_sample)
+                    else:
+                        sample_summary.append(str(sample))
+                    if i >= 99:  # 只取前100個
+                        break
+                
+                if sample_summary:
+                    dataset_info['sample_summary'] = sample_summary
+                    dataset_info['total_samples'] = len(dataset.samples)
+        except Exception as e:
+            logger.warning(f"獲取額外資料集資訊時出錯: {e}")
+            
+        # 添加檔案路徑（如果有）
+        if file_paths:
+            # 如果路徑太多，只保存一部分
+            if len(file_paths) > 100:
+                dataset_info['file_paths_sample'] = file_paths[:100]
+                dataset_info['total_files'] = len(file_paths)
+            else:
+                dataset_info['file_paths'] = file_paths
+                
+        # 保存為PT檔案（保留完整資訊，包括張量）
+        pt_filename = f"{dataset_type}_dataset_info.pt"
+        pt_save_path = os.path.join(datasets_dir, pt_filename)
+        torch.save(dataset_info, pt_save_path)
+        logger.info(f"{dataset_type} 資料集資訊已保存到: {pt_save_path}")
+        
+        # 同時保存為JSON檔案（易於查看，但不包括張量）
+        try:
+            json_filename = f"{dataset_type}_dataset_info.json"
+            json_save_path = os.path.join(datasets_dir, json_filename)
+            
+            # 處理不能序列化為JSON的物件
+            json_safe_info = {}
+            for k, v in dataset_info.items():
+                if isinstance(v, (np.ndarray, torch.Tensor)):
+                    if v.size < 1000:  # 避免過大
+                        json_safe_info[k] = v.tolist() if hasattr(v, 'tolist') else str(v)
+                    else:
+                        json_safe_info[k] = f"{type(v).__name__} of shape {v.shape}"
+                elif isinstance(v, dict):
+                    # 遞迴處理字典
+                    json_safe_dict = {}
+                    for dk, dv in v.items():
+                        if isinstance(dv, (np.ndarray, torch.Tensor)):
+                            if hasattr(dv, 'shape') and hasattr(dv, 'size') and dv.size < 1000:
+                                json_safe_dict[dk] = dv.tolist() if hasattr(dv, 'tolist') else str(dv)
+                            else:
+                                json_safe_dict[dk] = f"{type(dv).__name__} of shape {getattr(dv, 'shape', 'unknown')}"
+                        else:
+                            try:
+                                # 嘗試JSON序列化
+                                json.dumps({dk: dv})
+                                json_safe_dict[dk] = dv
+                            except (TypeError, OverflowError):
+                                json_safe_dict[dk] = str(dv)
+                    json_safe_info[k] = json_safe_dict
+                else:
+                    try:
+                        # 嘗試JSON序列化
+                        json.dumps({k: v})
+                        json_safe_info[k] = v
+                    except (TypeError, OverflowError):
+                        json_safe_info[k] = str(v)
+            
+            with open(json_save_path, 'w', encoding='utf-8') as f:
+                json.dump(json_safe_info, f, ensure_ascii=False, indent=2)
+            logger.info(f"{dataset_type} 資料集資訊(JSON)已保存到: {json_save_path}")
+        except Exception as e:
+            logger.warning(f"保存資料集資訊為JSON時出錯: {e}")
+        
+        return pt_save_path
+        
+    def save_datasets_statistics(self, train_dataset=None, val_dataset=None, test_dataset=None, 
+                               config: Dict[str, Any] = None) -> str:
+        """保存所有資料集的綜合統計資訊
+        
+        Args:
+            train_dataset: 訓練資料集
+            val_dataset: 驗證資料集
+            test_dataset: 測試資料集
+            config: 配置字典
+            
+        Returns:
+            str: 保存的文件路徑
+            
+        Description:
+            計算並保存所有資料集的綜合統計資訊，便於比較不同資料集的特性
+            
+        References:
+            無
+        """
+        # 創建 datasets 子目錄
+        datasets_dir = os.path.join(self.experiment_dir, 'datasets')
+        os.makedirs(datasets_dir, exist_ok=True)
+        
+        # 準備綜合統計資訊
+        stats = {
+            'timestamp': datetime.now().isoformat(),
+            'datasets': {}
+        }
+        
+        # 添加配置資訊（如果有）
+        if config:
+            data_config = config.get('data', {})
+            stats['data_config'] = {
+                'type': data_config.get('type', 'unknown'),
+                'splits': data_config.get('splits', {}),
+                'preprocessing': data_config.get('preprocessing', {}),
+            }
+        
+        # 收集各資料集的基本資訊
+        datasets = {
+            'train': train_dataset,
+            'val': val_dataset,
+            'test': test_dataset
+        }
+        
+        for name, dataset in datasets.items():
+            if dataset is not None:
+                stats['datasets'][name] = {
+                    'size': len(dataset)
+                }
+                
+                # 嘗試獲取更多資訊
+                try:
+                    # 類別分布
+                    if hasattr(dataset, 'get_class_distribution'):
+                        stats['datasets'][name]['class_distribution'] = dataset.get_class_distribution()
+                    elif hasattr(dataset, 'class_counts'):
+                        stats['datasets'][name]['class_distribution'] = dataset.class_counts
+                        
+                    # 特徵維度
+                    if hasattr(dataset, 'get_feature_dim'):
+                        stats['datasets'][name]['feature_dim'] = dataset.get_feature_dim()
+                    elif hasattr(dataset, 'feature_dim'):
+                        stats['datasets'][name]['feature_dim'] = dataset.feature_dim
+                except Exception as e:
+                    logger.warning(f"獲取{name}資料集統計資訊時出錯: {e}")
+        
+        # 保存為JSON檔案
+        save_path = os.path.join(datasets_dir, 'dataset_statistics.json')
+        with open(save_path, 'w', encoding='utf-8') as f:
+            json.dump(stats, f, ensure_ascii=False, indent=2)
+        logger.info(f"資料集綜合統計資訊已保存到: {save_path}")
+        
+        return save_path
+
+    # 新增方法：保存特徵向量數據
+    def save_feature_vector_data(self, data: Dict[str, Any], layer_name: str, epoch: int, 
+                                 dataset_name: str, suffix: str) -> str:
+        """保存特定層的特徵向量及其分析結果
+        
+        Args:
+            data (Dict[str, Any]): 要保存的數據字典 (例如包含 'activations', 'targets', 'tsne', 'cosine_similarity')
+            layer_name (str): 層的名稱
+            epoch (int): 當前的 epoch
+            dataset_name (str): 數據集名稱 (例如 'train', 'val', 'test')
+            suffix (str): 文件後綴，用於區分不同類型的數據 (例如 'features', 'tsne', 'cosine_similarity')
+            
+        Returns:
+            str: 保存的文件路徑
+        """
+        # 確保 feature_vectors 和 epoch 子目錄存在
+        epoch_feature_dir = os.path.join(self.get_path('feature_vectors', ''), f'epoch_{epoch}')
+        os.makedirs(epoch_feature_dir, exist_ok=True)
+        
+        # 構建文件名
+        clean_layer_name = layer_name.replace('.', '_') # 確保層名稱適用於文件名
+        filename = f"layer_{clean_layer_name}_{dataset_name}_{suffix}.pt"
+        save_path = os.path.join(epoch_feature_dir, filename)
+        
+        try:
+            torch.save(data, save_path)
+            logger.info(f"特徵向量數據已保存到: {save_path}")
+        except Exception as e:
+            logger.error(f"保存特徵向量數據到 {save_path} 時出錯: {e}", exc_info=True)
+            return "" # 或者拋出異常
         return save_path
 
 # 中文註解：這是save_manager.py的Minimal Executable Unit，檢查SaveManager能正確建立目錄、保存模型/結果/激活值，並測試錯誤路徑時的報錯

@@ -259,7 +259,7 @@ if __name__ == "__main__":
     with open(good_yaml, "w") as f:
         yaml.dump({
             "global": {},
-            "data": {"type": "audio", "source": {"wav_dir": "./"}, "use_index": True, "index_path": "data/data_index.csv", "label_field": "DrLee_Evaluation"},
+            "data": {"type": "audio", "source": {"wav_dir": "./"}, "use_index": True, "index_path": "data/metadata/data_index.csv", "label_field": "DrLee_Evaluation"},
             "model": {},
             "training": {}
         }, f)

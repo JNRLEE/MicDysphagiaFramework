@@ -69,13 +69,15 @@ class PyTorchTrainer:
             self.optimizer = model.configure_optimizers(lr, weight_decay)
         else:
             self.optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-        
+            
         # 獲取損失函數
         self.criterion = self._get_loss_function()
         
         # 記錄訓練過程
         self.train_losses = []
         self.val_losses = []
+        
+        # 初始化性能指標
         self.metrics = {'train': {}, 'val': {}}
         
         # 設置訓練目錄
@@ -110,8 +112,69 @@ class PyTorchTrainer:
         # 保存配置
         self.save_manager.save_config(config)
             
-        # 新增：初始化回調列表
+        # 初始化回調列表
         self.callbacks = []
+        
+        # 是否在評估時傳遞epoch信息
+        self.eval_epoch_tracking = False
+        
+        # 新增：保存模型結構信息
+        self._save_model_structure()
+    
+    def _save_model_structure(self):
+        """保存模型結構信息
+        
+        保存完整的模型結構信息，包括層結構、參數數量和形狀，
+        符合 framework_data_structure.md 中描述的格式。
+        """
+        try:
+            # 如果可能，導入 ModelStructureInfo
+            from models.model_structure import ModelStructureInfo
+            
+            # 創建模型結構信息
+            model_info = ModelStructureInfo(self.model)
+            model_structure = model_info.to_dict()
+            
+            # 保存模型結構信息
+            model_structure_path = os.path.join(self.output_dir, 'model_structure.json')
+            with open(model_structure_path, 'w') as f:
+                json.dump(model_structure, f, indent=2)
+            
+            logger.info(f"模型結構信息已保存到: {model_structure_path}")
+            
+        except (ImportError, AttributeError) as e:
+            # 如果無法導入 ModelStructureInfo，使用基本方法
+            logger.warning(f"無法使用 ModelStructureInfo: {e}，將使用基本方法記錄模型結構")
+            
+            # 創建基本的模型結構信息
+            model_structure = {
+                "model_summary": str(self.model),
+                "total_parameters": sum(p.numel() for p in self.model.parameters())
+            }
+            
+            # 嘗試添加層信息（如果可能）
+            try:
+                layer_info = []
+                for name, module in self.model.named_modules():
+                    if name and not any(c in name for c in "._"):  # 排除子模塊和私有模塊
+                        params = sum(p.numel() for p in module.parameters())
+                        if params > 0:  # 只包含有參數的層
+                            layer_info.append({
+                                "name": name,
+                                "type": module.__class__.__name__,
+                                "parameters": params
+                            })
+                
+                model_structure["layer_info"] = layer_info
+            except Exception as e2:
+                logger.warning(f"無法添加詳細的層信息: {e2}")
+            
+            # 保存基本模型結構信息
+            model_structure_path = os.path.join(self.output_dir, 'model_structure.json')
+            with open(model_structure_path, 'w') as f:
+                json.dump(model_structure, f, indent=2)
+            
+            logger.info(f"基本模型結構信息已保存到: {model_structure_path}")
 
     def add_callback(self, callback: CallbackInterface) -> None:
         """添加回調函數到訓練器
@@ -130,6 +193,25 @@ class PyTorchTrainer:
         """
         for callback in callbacks:
             self.add_callback(callback)
+
+    def set_eval_epoch_tracking(self, enable: bool = True) -> None:
+        """設置是否在評估時傳遞epoch參數到回調函數
+        
+        Args:
+            enable: 是否啟用評估epoch追蹤
+            
+        Returns:
+            None
+            
+        Description:
+            啟用或禁用評估epoch追蹤功能，當啟用時，會在評估過程中將當前epoch傳遞給回調函數，
+            便於進行特定epoch的特徵向量捕獲等操作。
+            
+        References:
+            無
+        """
+        self.eval_epoch_tracking = enable
+        logger.info(f"評估epoch追蹤已{'啟用' if enable else '禁用'}")
 
     def train(self, train_loader: DataLoader, val_loader: DataLoader, test_loader: Optional[DataLoader] = None) -> Dict[str, Any]:
         """使用提供的數據加載器訓練模型
@@ -155,26 +237,131 @@ class PyTorchTrainer:
             test_loader
         )
         
-        start_time = time.time()
+        # 新增：如果使用加權損失函數，計算類別權重
+        loss_type = self.config.get('training', {}).get('loss', {}).get('type', '')
+        if loss_type == 'WeightedCrossEntropyLoss' and isinstance(self.criterion, torch.nn.Module):
+            logger.info("檢測到使用加權交叉熵損失，正在計算類別權重...")
+            # 收集訓練數據的所有標籤
+            all_labels = []
+            for batch_data in tqdm(train_loader, desc="收集類別分布"):
+                # 處理不同格式的批次數據
+                if isinstance(batch_data, tuple) and len(batch_data) >= 2:
+                    labels = batch_data[1]
+                elif isinstance(batch_data, dict):
+                    labels = batch_data.get('label', batch_data.get('target', batch_data.get('score')))
+                else:
+                    logger.warning(f"無法從批次數據中提取標籤，格式未知: {type(batch_data)}")
+                    continue
+                
+                # 確保標籤是張量並收集
+                if not isinstance(labels, torch.Tensor):
+                    try:
+                        labels = torch.tensor(labels)
+                    except:
+                        logger.warning(f"無法將標籤轉換為張量: {type(labels)}")
+                        continue
+                
+                all_labels.append(labels)
+            
+            # 合併所有標籤並更新損失函數權重
+            if all_labels:
+                try:
+                    combined_labels = torch.cat(all_labels)
+                    if hasattr(self.criterion, 'update_weight_from_labels'):
+                        self.criterion.update_weight_from_labels(combined_labels)
+                        weights = self.criterion.get_class_weights()
+                        if weights is not None:
+                            logger.info(f"類別權重已更新: {weights.cpu().numpy()}")
+                    else:
+                        logger.warning("損失函數缺少update_weight_from_labels方法")
+                except Exception as e:
+                    logger.error(f"更新類別權重時出錯: {str(e)}")
         
-        # 新增：調用訓練開始回調
-        logs = {'tensorboard_writer': self.writer}
+        self._log_experiment_metadata({
+            'event': 'experiment_start',
+            'experiment_name': self.config.get('global', {}).get('experiment_name', 'unknown'),
+            'timestamp': datetime.now().isoformat(),
+            'config_details': {
+                'model_type': self.config.get('model',{}).get('type'),
+                'epochs': self.epochs,
+                'optimizer': self.config.get('training',{}).get('optimizer',{}).get('type'),
+                'loss_function': self.config.get('training',{}).get('loss',{}).get('type')
+            }
+        })
+
+        start_time = time.time()
+        logs = {
+            'tensorboard_writer': self.writer,
+            'config': self.config
+        }
         for callback in self.callbacks:
             callback.on_train_begin(self.model, logs)
         
+        # 顯示進度條
+        progress_bar = tqdm(range(self.epochs), desc="Training")
+        
+        # 初始化監控變量
+        no_improvement_count = 0
+        best_val_metric = float('inf')
+        best_val_metric_name = 'loss'  # 默認使用損失作為監控指標
+        best_val_metric_mode = 'min'   # 默認模式是越小越好
+        
+        # 從配置中獲取最佳模型保存條件
+        if 'evaluation' in self.config and 'validation' in self.config['evaluation']:
+            best_val_metric_name = self.config['evaluation']['validation'].get('best_model_metric', 'loss')
+            best_val_metric_mode = self.config['evaluation']['validation'].get('best_model_mode', 'min')
+            
+        # 設置初始最佳值
+        if best_val_metric_mode == 'max':
+            best_val_metric = float('-inf')
+            
+        logger.info(f"監控指標: {best_val_metric_name}, 模式: {best_val_metric_mode}")
+        
+        # 主訓練循環
         for epoch in range(self.epochs):
-            # 新增：調用 epoch 開始回調
-            epoch_logs = {'epoch': epoch, 'tensorboard_writer': self.writer}
+            epoch_start_time = time.time()
+            
+            epoch_logs = {'epoch': epoch, 'tensorboard_writer': self.writer, 'config': self.config}
             for callback in self.callbacks:
                 callback.on_epoch_begin(epoch, self.model, epoch_logs)
             
-            # 訓練一個 epoch
+            self._log_experiment_metadata({
+                'event': 'epoch_begin',
+                'epoch': epoch,
+                'timestamp': datetime.now().isoformat()
+            })
+            
             train_loss, train_metrics = self._train_epoch(train_loader, epoch)
             self.train_losses.append(train_loss)
             
-            # 驗證一個 epoch
-            val_loss, val_metrics = self._validate_epoch(val_loader, epoch)
+            # --- 驗證階段 --- 
+            # 在調用 _validate_epoch 之前觸發 on_evaluation_begin for 'val' dataset
+            eval_begin_logs_val = {
+                'epoch': epoch, 
+                'dataset_name': 'val', 
+                'tensorboard_writer': self.writer,
+                'config': self.config
+            }
+            for callback in self.callbacks:
+                if hasattr(callback, 'on_evaluation_begin'):
+                    callback.on_evaluation_begin(self.model, logs=eval_begin_logs_val)
+            
+            val_loss, val_metrics = self._validate_epoch(val_loader, epoch, phase_name='val') # 傳遞 phase_name
             self.val_losses.append(val_loss)
+
+            # 在獲取 val_metrics 之後觸發 on_evaluation_end for 'val' dataset
+            eval_end_logs_val = {
+                'epoch': epoch, 
+                'dataset_name': 'val',
+                'loss': val_loss,
+                'metrics': val_metrics, # 傳遞計算得到的指標
+                'tensorboard_writer': self.writer,
+                'config': self.config
+            }
+            for callback in self.callbacks:
+                if hasattr(callback, 'on_evaluation_end'):
+                    callback.on_evaluation_end(self.model, results=val_metrics, logs=eval_end_logs_val)
+            # --- 驗證階段結束 ---
 
             # --- TensorBoard 記錄 ---
             # 記錄損失
@@ -197,7 +384,7 @@ class PyTorchTrainer:
             # 記錄驗證指標
             for metric_name, metric_value in val_metrics.items():
                 # 僅當指標值是標量時才記錄到 TensorBoard，並跳過我們添加的特殊鍵
-                if metric_name not in ['outputs', 'targets', 'predictions'] and (not isinstance(metric_value, torch.Tensor) or metric_value.numel() == 1):
+                if metric_name not in ['outputs', 'targets', 'predictions']:
                     # 確保值是標量
                     if isinstance(metric_value, torch.Tensor):
                         metric_value = metric_value.item()
@@ -230,6 +417,15 @@ class PyTorchTrainer:
                 best_model_path = self._save_best_model(epoch, val_loss)
                 
                 logger.info(f"Epoch {epoch+1}/{self.epochs} - 保存新的最佳模型: {best_model_path}")
+                self._log_experiment_metadata({
+                    'event': 'best_model_saved',
+                    'epoch': epoch,
+                    'metric_name': best_val_metric_name,
+                    'metric_value': val_loss, # 或者實際的最佳指標值
+                    'path': best_model_path, # 從 _save_best_model 獲取
+                    'timestamp': datetime.now().isoformat()
+                })
+                self._previous_best_val_loss = val_loss # 追蹤上一個最佳損失以避免重複記錄
             elif self.early_stopping_enabled:  # 只有在啟用早期停止時才減少耐心值
                 self.patience -= 1
                 if self.patience <= 0:
@@ -241,6 +437,12 @@ class PyTorchTrainer:
             if save_every > 0 and (epoch + 1) % save_every == 0:
                 checkpoint_path = self._save_checkpoint(epoch, val_loss)
                 logger.info(f"Epoch {epoch+1}/{self.epochs} - 已保存檢查點: {checkpoint_path}")
+                self._log_experiment_metadata({
+                    'event': 'checkpoint_saved',
+                    'epoch': epoch,
+                    # 'path': checkpoint_path, # 從 _save_checkpoint 獲取
+                    'timestamp': datetime.now().isoformat()
+                })
 
                 # ========== 新增：定期紀錄梯度分布與GNS ========== #
                 # 1. 收集所有參數的梯度
@@ -252,6 +454,7 @@ class PyTorchTrainer:
 
                 # 2. 收集本epoch所有batch的梯度（需在 _train_epoch 收集）
                 if hasattr(self, '_epoch_batch_grads') and self._epoch_batch_grads:
+                    logger.info(f"Epoch {epoch}: _epoch_batch_grads contains {len(self._epoch_batch_grads)} entries. Ready for GNS calculation.") # <--- 新增日誌
                     # 將所有batch的梯度攤平成一維，組成一個list
                     grads_list = [g.view(-1) for g in self._epoch_batch_grads]
                     grads_tensor = torch.stack(grads_list)
@@ -281,6 +484,8 @@ class PyTorchTrainer:
                     })
                     # 清空暫存
                     self._epoch_batch_grads = []
+                else: # <--- 新增 else 分支記錄日誌
+                    logger.warning(f"Epoch {epoch}: _epoch_batch_grads is empty or does not exist. Skipping GNS calculation and related gradient saving for GNS.")
                 # ========== END ========== #
             
             # 新增：調用 epoch 結束回調
@@ -294,6 +499,15 @@ class PyTorchTrainer:
             for callback in self.callbacks:
                 callback.on_epoch_end(epoch, self.model, train_logs, val_logs, combined_logs)
             
+            self._log_experiment_metadata({
+                'event': 'epoch_end',
+                'epoch': epoch,
+                'train_loss': train_loss,
+                'val_loss': val_loss,
+                'learning_rate': current_lr,
+                'timestamp': datetime.now().isoformat(),
+                'epoch_duration_seconds': time.time() - epoch_start_time
+            })
             logger.info(f"Epoch {epoch+1}/{self.epochs} - 訓練損失: {train_loss:.4f}, 驗證損失: {val_loss:.4f}")
         
         # 訓練結束
@@ -363,36 +577,65 @@ class PyTorchTrainer:
             'training_time': float(elapsed_time)
         }
         
-        # 如果有測試集，進行評估
         if test_loader is not None:
             logger.info("在測試集上評估最佳模型...")
             
-            # 新增：調用評估開始回調
-            eval_logs = {'mode': 'test', 'tensorboard_writer': self.writer}
+            eval_begin_logs_test = {
+                'epoch': self.epochs -1, 
+                'dataset_name': 'test', 
+                'tensorboard_writer': self.writer,
+                'config': self.config
+            }
             for callback in self.callbacks:
-                callback.on_evaluation_begin(self.model, eval_logs)
-                
-            test_loss, test_metrics = self._validate_epoch(test_loader, self.epochs - 1, is_test=True)
+                if hasattr(callback, 'on_evaluation_begin'):
+                    callback.on_evaluation_begin(self.model, logs=eval_begin_logs_test)
+
+            test_loss, test_metrics_dict = self._validate_epoch(test_loader, self.epochs - 1, phase_name='test') 
             
-            # 記錄測試結果
+            eval_end_logs_test = {
+                'epoch': self.epochs - 1,
+                'dataset_name': 'test',
+                'loss': test_loss,
+                'metrics': test_metrics_dict,
+                'tensorboard_writer': self.writer,
+                'config': self.config
+            }
+            for callback in self.callbacks:
+                if hasattr(callback, 'on_evaluation_end'):
+                    callback.on_evaluation_end(self.model, results=test_metrics_dict, logs=eval_end_logs_test)
+            
             results['test_loss'] = float(test_loss)
-            results['test_metrics'] = {k: float(v) for k, v in test_metrics.items()}
             
-            # 保存測試預測結果
-            if hasattr(self, 'test_predictions') and self.test_predictions is not None:
-                pred_path = os.path.join(self.output_dir, 'test_predictions.pt')
-                torch.save(self.test_predictions, pred_path)
-                logger.info(f"測試預測已保存至 {pred_path}")
+            # 處理 test_metrics_dict，只轉換真正的標量指標
+            processed_test_metrics = {}
+            for k, v in test_metrics_dict.items():
+                if k not in ['outputs', 'targets', 'predictions']: # 跳過原始數據張量
+                    try:
+                        if isinstance(v, torch.Tensor) and v.numel() == 1:
+                            processed_test_metrics[k] = float(v.item())
+                        elif isinstance(v, (int, float)):
+                            processed_test_metrics[k] = float(v)
+                        else:
+                            # 如果是其他類型或多元素張量，可能需要記錄或跳過
+                            logger.warning(f"測試指標 '{k}' 的值 '{v}' (類型: {type(v)}) 不是標量，將不包含在最終結果中。")
+                    except Exception as e:
+                        logger.error(f"轉換測試指標 '{k}' (值: {v}) 時出錯: {e}")
+            results['test_metrics'] = processed_test_metrics
             
-            # 輸出測試結果
-            logger.info(f"測試損失: {test_loss:.4f}")
-            for metric_name, metric_value in test_metrics.items():
-                logger.info(f"測試 {metric_name}: {metric_value:.4f}")
-                
-            # 新增：調用評估結束回調
-            eval_results = {'loss': test_loss, 'metrics': test_metrics}
-            for callback in self.callbacks:
-                callback.on_evaluation_end(self.model, eval_results, eval_logs)
+            logger.info(f"測試損失: {results['test_loss']:.4f}")
+            for name, value in results['test_metrics'].items():
+                 logger.info(f"測試 {name}: {value:.4f}")
+            # ... (保存測試預測等，EvaluationResultsHook 應該已經處理了 test_predictions.pt 的保存) ...
+        
+        self._log_experiment_metadata({
+            'event': 'experiment_end',
+            'total_epochs_completed': epoch + 1, # 實際完成的epoch數
+            'best_val_loss': float(self.best_val_loss),
+            'total_training_time_seconds': elapsed_time,
+            'final_metrics_train': train_metrics, # 最後一個epoch的訓練指標
+            'final_metrics_val': val_metrics,     # 最後一個epoch的驗證指標
+            'timestamp': datetime.now().isoformat()
+        })
         
         return results
 
@@ -408,37 +651,31 @@ class PyTorchTrainer:
         """
         self.model.train()
         total_loss = 0.0
-        all_outputs = []
-        all_targets = []
-        # ========== 新增：本epoch所有batch梯度暫存 ========== #
+        all_outputs_train = [] # 與評估分開
+        all_targets_train = [] # 與評估分開
         self._epoch_batch_grads = []
-        # ========== END ========== #
-        # 使用 tqdm 顯示進度條
         progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{self.epochs} [Train]")
         
-        for batch_idx, batch in enumerate(progress_bar):
-            # 準備批次數據
-            batch = self._prepare_batch(batch)
+        for batch_idx, batch_data_tuple in enumerate(progress_bar):
+            batch = self._prepare_batch(batch_data_tuple)
             inputs = batch.get('inputs')
             targets = batch.get('targets')
             
-            # 新增：調用批次開始回調
             batch_logs = {
                 'batch_idx': batch_idx, 
                 'epoch': epoch, 
                 'phase': 'train',
-                'tensorboard_writer': self.writer
+                'tensorboard_writer': self.writer,
+                'config': self.config,
+                'is_last_batch': batch_idx == len(train_loader) -1
             }
             for callback in self.callbacks:
-                callback.on_batch_begin(batch_idx, self.model, inputs, targets, batch_logs)
+                if hasattr(callback, 'on_batch_begin'):
+                    callback.on_batch_begin(batch_idx, self.model, inputs, targets, batch_logs)
                 
-            # 前向傳播
             outputs = self._forward_pass(batch)
-            
-            # 計算損失
             loss = self._compute_loss(outputs, batch)
             
-            # 反向傳播
             self.optimizer.zero_grad()
             loss.backward()
             # ========== 新增：收集本batch梯度 ========== #
@@ -462,8 +699,8 @@ class PyTorchTrainer:
             # 收集預測和目標值，用於計算指標
             predictions = self._get_predictions(outputs)
             if predictions is not None and targets is not None:
-                all_outputs.append(predictions.detach().cpu())
-                all_targets.append(targets.detach().cpu())
+                all_outputs_train.append(predictions.detach().cpu())
+                all_targets_train.append(targets.detach().cpu())
                 
             # 新增：調用批次結束回調
             batch_end_logs = {
@@ -471,186 +708,436 @@ class PyTorchTrainer:
                 'epoch': epoch, 
                 'loss': loss.item(),
                 'phase': 'train',
-                'tensorboard_writer': self.writer
+                'tensorboard_writer': self.writer,
+                'config': self.config,
+                'is_last_batch': batch_idx == len(train_loader) -1
             }
             for callback in self.callbacks:
-                callback.on_batch_end(batch_idx, self.model, inputs, targets, outputs, loss, batch_end_logs)
+                if hasattr(callback, 'on_batch_end'):
+                     callback.on_batch_end(batch_idx, self.model, inputs, targets, outputs, loss, batch_end_logs)
         
         # 計算平均損失
         avg_loss = total_loss / len(train_loader)
         
         # 計算全局指標（僅當有輸出和目標時）
         metrics = {}
-        if all_outputs and all_targets:
+        if all_outputs_train and all_targets_train:
             try:
                 # 將所有批次的輸出和目標連接起來
-                combined_outputs = torch.cat(all_outputs, dim=0)
-                combined_targets = torch.cat(all_targets, dim=0)
+                combined_outputs = torch.cat(all_outputs_train, dim=0)
+                combined_targets = torch.cat(all_targets_train, dim=0)
                 
                 # 計算指標
                 metrics = self._compute_metrics(combined_outputs, {'targets': combined_targets})
             except Exception as e:
                 logger.warning(f"計算訓練指標時出錯: {str(e)}")
         
+        # ========== 新增：計算GNS (Gradient Noise Scale) ========== #
+        if len(self._epoch_batch_grads) > 1:
+            try:
+                # 計算批次間梯度總變異數
+                batch_grads = torch.stack(self._epoch_batch_grads)
+                batch_mean = batch_grads.mean(dim=0)
+                
+                # 計算總變異數 (within-batch gradient variance)
+                total_var = ((batch_grads - batch_mean) ** 2).mean()
+                
+                # 計算梯度均值的平方範數 (squared norm of the mean gradient)
+                mean_norm_sq = torch.norm(batch_mean) ** 2
+                
+                # 計算 GNS = total_var / mean_norm_sq
+                if mean_norm_sq > 0:
+                    gns = total_var / mean_norm_sq
+                    
+                    # 創建 GNS 統計量字典
+                    gns_stats = {
+                        'gns': float(gns.item()),
+                        'total_var': float(total_var.item()),
+                        'mean_norm_sq': float(mean_norm_sq.item()),
+                        'epoch': epoch,
+                        'timestamp': datetime.now().isoformat(),
+                        'reference': "https://arxiv.org/abs/2006.08536"
+                    }
+                    
+                    # 使用 SaveManager 保存 GNS 統計量
+                    if hasattr(self, 'save_manager'):
+                        self.save_manager.save_gns_stats(gns_stats, epoch)
+                    else:
+                        # 如果 save_manager 不可用，手動保存
+                        epoch_dir = os.path.join(self.output_dir, 'hooks', f'epoch_{epoch}')
+                        os.makedirs(epoch_dir, exist_ok=True)
+                        gns_path = os.path.join(epoch_dir, f'gns_stats_epoch_{epoch}.json')
+                        with open(gns_path, 'w') as f:
+                            json.dump(gns_stats, f, indent=2)
+                        logger.info(f"GNS 統計量已手動保存到: {gns_path}")
+                        
+                    logger.info(f"Epoch {epoch} GNS = {gns.item():.4f}")
+            except Exception as e:
+                logger.warning(f"計算 GNS 統計量時出錯: {str(e)}")
+        # ========== END ========== #
+        
         return avg_loss, metrics
 
-    def _validate_epoch(self, val_loader: DataLoader, epoch: int, is_test: bool = False) -> Tuple[float, Dict[str, float]]:
-        """驗證或測試一個 epoch
-        
-        Args:
-            val_loader: 驗證數據加載器
-            epoch: 當前 epoch 編號
-            is_test: 是否為測試模式（而非驗證）
-            
-        Returns:
-            Tuple[float, Dict[str, float]]: 驗證/測試損失和指標
-        """
+    def _validate_epoch(self, val_loader: DataLoader, epoch: int, phase_name: str = 'val') -> Tuple[float, Dict[str, float]]:
+        """驗證或測試一個 epoch"""
         self.model.eval()
         total_loss = 0.0
-        all_outputs = []
-        all_targets = []
-        all_predictions = []
-        all_raw_inputs = []  # 保存原始輸入，用於後續分析
+        all_outputs_eval = [] 
+        all_targets_eval = [] 
+        all_predictions_eval = [] # 恢復此列表以收集處理後的預測
 
-        phase = "Test" if is_test else "Val"
-        progress_bar = tqdm(val_loader, desc=f"Epoch {epoch+1}/{self.epochs} [{phase}]")
-        
-        # 儲存預測結果和真實值，用於後續分析
-        all_batch_outputs = []
-        all_batch_targets = []
-        
-        # 跟蹤批次數量
+        progress_bar = tqdm(val_loader, desc=f"Epoch {epoch+1}/{self.epochs} [{phase_name.upper()}]")
         batch_count = 0
         
         with torch.no_grad():
-            for batch_idx, batch in enumerate(progress_bar):
-                # 準備批次數據
-                batch = self._prepare_batch(batch)
+            for batch_idx, batch_data_tuple in enumerate(progress_bar):
+                batch = self._prepare_batch(batch_data_tuple)
                 inputs = batch.get('inputs')
-                # 正確地獲取目標值，檢查 'label', 'score', 或 'target'
-                actual_targets = batch.get('label', batch.get('score', batch.get('target', None)))
+                targets = batch.get('targets') 
+                if targets is None:
+                    logger.warning(f"警告: 在 {phase_name} 階段的批次 {batch_idx} 中，未能從 batch.get('targets') 獲取到目標值。可用鍵: {list(batch.keys())}")
                 
-                # 新增：調用批次開始回調（驗證/測試階段）
                 batch_logs = {
                     'batch_idx': batch_idx, 
                     'epoch': epoch,
-                    'phase': 'test' if is_test else 'val',
-                    'tensorboard_writer': self.writer
+                    'phase': phase_name,
+                    'tensorboard_writer': self.writer,
+                    'config': self.config,
+                    'dataset_name': phase_name, 
+                    'is_last_batch': batch_idx == len(val_loader) -1
                 }
                 for callback in self.callbacks:
-                    callback.on_batch_begin(batch_idx, self.model, inputs, actual_targets, batch_logs) # 傳遞 actual_targets
+                    if hasattr(callback, 'on_batch_begin'):
+                        callback.on_batch_begin(batch_idx, self.model, inputs, targets, batch_logs)
                 
-                # 前向傳播
                 outputs = self._forward_pass(batch)
-                
-                # 計算損失 (內部會查找 'label', 'score', 'target')
-                loss = self._compute_loss(outputs, batch)
-                
-                # 更新總損失
+                loss = self._compute_loss(outputs, batch) 
                 total_loss += loss.item()
                 batch_count += 1
                 
-                # 獲取預測結果
-                predictions = self._get_predictions(outputs)
+                predictions = self._get_predictions(outputs) 
                 
-                # 使用 actual_targets 進行條件判斷和數據收集
-                if predictions is not None and actual_targets is not None:
-                    all_outputs.append(outputs.detach().cpu())
-                    all_targets.append(actual_targets.detach().cpu()) # 使用 actual_targets
-                    all_predictions.append(predictions.detach().cpu())
-                    if inputs is not None:
-                         # 確保 inputs 也是 Tensor 才進行 detach 和 cpu 操作
-                         if isinstance(inputs, torch.Tensor):
-                             all_raw_inputs.append(inputs.detach().cpu())
-                         else:
-                              # 如果 inputs 不是 Tensor (例如路徑列表)，直接附加或進行其他處理
-                              # all_raw_inputs.append(inputs) # 根據需要調整
-                              logger.debug(f"Batch inputs are not a tensor in {phase} phase, type: {type(inputs)}")
+                if outputs is not None:
+                    all_outputs_eval.append(outputs.detach().cpu()) 
+                if targets is not None: 
+                    all_targets_eval.append(targets.detach().cpu())
                 else:
-                     # 添加調試信息，了解為何數據未被收集
-                     if predictions is None:
-                          logger.debug(f"Skipping metrics accumulation in {phase}: predictions are None. Batch keys: {list(batch.keys())}")
-                     if actual_targets is None:
-                          logger.debug(f"Skipping metrics accumulation in {phase}: targets (label/score/target) are None. Batch keys: {list(batch.keys())}")
-
+                    logger.debug(f"在 {phase_name} 階段的批次 {batch_idx}，targets 為 None，未添加到 all_targets_eval")
                 
-                # 更新進度條
+                if predictions is not None: # 現在可以安全地附加
+                    all_predictions_eval.append(predictions.detach().cpu())
+                else:
+                    logger.debug(f"在 {phase_name} 階段的批次 {batch_idx}，_get_predictions 返回 None")
+
                 progress_bar.set_postfix({'loss': loss.item()})
                 
-                # 新增：調用批次結束回調（驗證/測試階段）
                 batch_end_logs = {
                     'batch_idx': batch_idx, 
-                    'epoch': epoch,
+                    'epoch': epoch, 
                     'loss': loss.item(),
-                    'phase': 'test' if is_test else 'val',
-                    'tensorboard_writer': self.writer
+                    'phase': phase_name,
+                    'tensorboard_writer': self.writer,
+                    'config': self.config,
+                    'dataset_name': phase_name, 
+                    'is_last_batch': batch_idx == len(val_loader) -1,
+                    'actual_targets': targets 
                 }
                 for callback in self.callbacks:
-                    # 確保傳遞正確的 targets 給回調
-                    callback.on_batch_end(batch_idx, self.model, inputs, actual_targets, outputs, loss, batch_end_logs)
+                    if hasattr(callback, 'on_batch_end'):
+                        callback.on_batch_end(batch_idx, self.model, inputs, targets, outputs, loss, batch_end_logs)
         
-        # 計算平均損失，添加保護以防止除以零錯誤
         if batch_count > 0:
             avg_loss = total_loss / batch_count
         else:
-            logger.warning(f"{phase} 數據加載器為空，無法計算損失，返回零損失")
+            logger.warning(f"{phase_name.upper()} 數據加載器為空，返回零損失")
             avg_loss = 0.0
         
-        # 計算全局指標
-        metrics = {}
-        if len(all_outputs) > 0 and len(all_targets) > 0:
-            try:
-                # 準備合併所有批次的數據
-                combined_outputs = torch.cat(all_outputs, dim=0)
-                combined_targets = torch.cat(all_targets, dim=0)
-                combined_predictions = torch.cat(all_predictions, dim=0)
-                
-                # 計算指標 (修改這裡，傳遞包含 'targets' 的字典)
-                metrics = self._compute_metrics(combined_predictions, {'targets': combined_targets})
-                
-                # 如果是測試模式，保存預測結果和真實值
-                if is_test:
-                    self.test_predictions = {
-                        'outputs': combined_outputs,
-                        'targets': combined_targets,
-                        'predictions': combined_predictions
-                    }
-                    
-                    # 如果有保存原始輸入，也加入到結果中
-                    if all_raw_inputs:
-                        try:
-                            combined_inputs = torch.cat(all_raw_inputs, dim=0)
-                            self.test_predictions['inputs'] = combined_inputs
-                        except Exception as e:
-                            logger.warning(f"合併測試輸入數據時出錯: {str(e)}")
-                else:
-                    # 為了在 epoch 結束回調中使用，將驗證集預測結果添加到指標字典中
-                    metrics['outputs'] = combined_outputs
-                    metrics['targets'] = combined_targets
-                    metrics['predictions'] = combined_predictions
-            except Exception as e:
-                logger.warning(f"計算{phase.lower()}指標時出錯: {str(e)}")
-        else:
-            logger.warning(f"{phase} 數據集中沒有足夠的樣本進行評估，指標計算已跳過")
-        
-        return avg_loss, metrics
+        metrics = {} 
+        metrics_for_callbacks = {
+            'outputs': None, 
+            'targets': None,
+            'predictions': None
+        }
 
-    def _prepare_batch(self, batch: Dict[str, Any]) -> Dict[str, Any]:
-        """準備批次數據：將數據移至適當的設備
+        if all_outputs_eval:
+            final_raw_outputs = torch.cat(all_outputs_eval, dim=0)
+            metrics_for_callbacks['outputs'] = final_raw_outputs
+            
+            # # 從 final_raw_outputs 生成 predictions 的邏輯已移至下方，
+            # # 直接使用 all_predictions_eval 拼接的結果更直接
+            # is_classification_task = self.config.get('model', {}).get('parameters', {}).get('is_classification', True)
+            # if is_classification_task:
+            #     if final_raw_outputs.dim() > 1 and final_raw_outputs.size(1) > 1:
+            #         probs = torch.softmax(final_raw_outputs, dim=1)
+            #         preds = torch.argmax(probs, dim=1)
+            #     elif final_raw_outputs.dim() > 0:
+            #         probs = torch.sigmoid(final_raw_outputs)
+            #         preds = (probs > 0.5).long()
+            #         if preds.dim() == 2 and preds.size(1) == 1: preds = preds.squeeze(1)
+            #     else: preds = None
+            #     metrics_for_callbacks['predictions'] = preds
+            # else: # 回歸
+            #     metrics_for_callbacks['predictions'] = final_raw_outputs
+
+        if all_targets_eval:
+            final_targets = torch.cat(all_targets_eval, dim=0)
+            metrics_for_callbacks['targets'] = final_targets
+        
+        if all_predictions_eval: # 使用收集到的 all_predictions_eval
+            final_predictions = torch.cat(all_predictions_eval, dim=0)
+            metrics_for_callbacks['predictions'] = final_predictions
+
+        if metrics_for_callbacks['targets'] is not None and metrics_for_callbacks['predictions'] is not None:
+            try:
+                metrics = self._compute_metrics(metrics_for_callbacks['predictions'], {'targets': metrics_for_callbacks['targets']})
+            except Exception as e:
+                logger.warning(f"計算 {phase_name} 指標時出錯: {str(e)}", exc_info=True)
+        else:
+            logger.warning(f"{phase_name.upper()} 數據集中沒有足夠的目標和預測數據 ({'targets missing' if metrics_for_callbacks['targets'] is None else ''} {'predictions missing' if metrics_for_callbacks['predictions'] is None else ''}) 進行指標計算，指標計算已跳過")
+        
+        final_returned_metrics = {**metrics_for_callbacks, **metrics}
+        return avg_loss, final_returned_metrics
+
+    def evaluate(self, test_loader: DataLoader, epoch: Optional[int] = None) -> Dict[str, Any]:
+        """評估模型性能"""
+        logger.info("開始評估模型...")
+        current_epoch_for_eval = epoch if epoch is not None else self.epochs -1 # 使用提供的epoch或最後一個epoch
+
+        # --- 評估開始 --- 
+        eval_begin_logs = {
+            'epoch': current_epoch_for_eval,
+            'dataset_name': 'test', # 假設 evaluate 總是對 'test' 數據集
+            'tensorboard_writer': self.writer,
+            'config': self.config
+        }
+        for callback in self.callbacks:
+            if hasattr(callback, 'on_evaluation_begin'):
+                callback.on_evaluation_begin(self.model, logs=eval_begin_logs)
+        
+        loss, metrics = self._validate_epoch(test_loader, current_epoch_for_eval, phase_name='test')
+
+        # --- 評估結束 --- 
+        eval_end_logs = {
+            'epoch': current_epoch_for_eval,
+            'dataset_name': 'test',
+            'loss': loss,
+            'metrics': metrics,
+            'tensorboard_writer': self.writer,
+            'config': self.config
+        }
+        for callback in self.callbacks:
+            if hasattr(callback, 'on_evaluation_end'):
+                callback.on_evaluation_end(self.model, results=metrics, logs=eval_end_logs)
+        
+        logger.info(f"評估完成。損失: {loss:.4f}")
+        for metric_name, metric_value in metrics.items():
+            # 跳過非標量內部使用的鍵
+            if metric_name not in ['outputs', 'targets', 'predictions']:
+                 if isinstance(metric_value, (int, float, torch.Tensor)):
+                     logger.info(f"指標 {metric_name}: {float(metric_value):.4f}")
+                 else:
+                     logger.info(f"指標 {metric_name}: {metric_value}")
+        
+        # 返回包含損失和指標的字典 (確保值是Python原生類型)
+        results_to_return = {'loss': float(loss)}
+        for k, v in metrics.items():
+            if k not in ['outputs', 'targets', 'predictions']:
+                try:
+                    results_to_return[k] = float(v)
+                except:
+                    results_to_return[k] = v # 如果不能轉為float，保留原樣
+        return results_to_return
+
+    def _prepare_batch(self, batch_input: Any) -> Dict[str, Optional[torch.Tensor]]:
+        """
+        Prepares a batch of data by moving tensors to the configured device and
+        ensuring the batch is in a dictionary format with 'inputs' and 'targets' keys.
         
         Args:
-            batch: 批次數據字典
+            batch_input (Any): The input batch, can be a tensor, list/tuple of tensors, or a dictionary.
             
         Returns:
-            Dict[str, Any]: 處理後的批次數據
+            Dict[str, Optional[torch.Tensor]]: A dictionary containing 'inputs' and 'targets' tensors,
+                                              both moved to the appropriate device. Other keys from the
+                                              original batch_input (if it was a dict) are also preserved.
+                                              'inputs' or 'targets' can be None if not applicable or found.
         """
+        # 在 PytorchTrainer._prepare_batch 中
+        logger.debug(f"進入 _prepare_batch, batch_input 類型: {type(batch_input)}")
         prepared_batch = {}
-        for key, value in batch.items():
-            if isinstance(value, torch.Tensor):
-                prepared_batch[key] = value.to(self.device)
+
+        if isinstance(batch_input, torch.Tensor):
+            logger.debug("批次輸入是單個張量，假設它是輸入。")
+            prepared_batch['inputs'] = batch_input.to(self.device)
+            prepared_batch['targets'] = None # 沒有目標資訊
+            return prepared_batch
+
+        elif isinstance(batch_input, (list, tuple)):
+            if not batch_input:
+                logger.warning("批次輸入是空列表/元組。")
+                return {'inputs': None, 'targets': None}
+
+            if len(batch_input) == 1:
+                logger.debug("批次輸入是包含單個元素的列表/元組，假設它是輸入。")
+                if isinstance(batch_input[0], torch.Tensor):
+                    prepared_batch['inputs'] = batch_input[0].to(self.device)
+                else: # 如果不是張量，嘗試轉換或記錄錯誤
+                    logger.warning(f"列表/元組中的單個元素不是張量，類型為: {type(batch_input[0])}")
+                    prepared_batch['inputs'] = None # 或者嘗試轉換 batch_input[0]
+                prepared_batch['targets'] = None
+                prepared_batch['label'] = None
+                return prepared_batch
+
+            elif len(batch_input) >= 2:
+                logger.debug("批次輸入是包含多個元素的列表/元組，假設第一個是輸入，第二個是目標。")
+                # Handle inputs
+                if isinstance(batch_input[0], torch.Tensor):
+                    inputs_data = batch_input[0]
+                elif isinstance(batch_input[0], dict) and 'inputs' in batch_input[0]: # 嵌套字典的情況
+                    inputs_data = batch_input[0]['inputs']
+                else: # 嘗試從字典中推斷輸入
+                    inputs_data = self._infer_input_from_dict(batch_input[0] if isinstance(batch_input[0], dict) else {'data': batch_input[0]})
+
+                # Handle targets
+                if isinstance(batch_input[1], torch.Tensor):
+                    label_data = batch_input[1]
+                elif isinstance(batch_input[1], dict) and ('targets' in batch_input[1] or 'label' in batch_input[1]):
+                    label_data = batch_input[1].get('targets', batch_input[1].get('label'))
+                else:
+                    label_data = batch_input[1] # Assume it might be a tensor-like object or will be handled
+
+                # Create a temporary dictionary to hold standardized keys before moving to device
+                converted_batch = {}
+                
+                # Determine primary input key - this part is tricky if batch_input[0] is not a tensor directly
+                # Let's assume if batch_input[0] is a dict, it should contain a primary data key
+                data_key = 'inputs' # Default data key
+                if isinstance(inputs_data, torch.Tensor):
+                    converted_batch[data_key] = inputs_data
+                elif isinstance(inputs_data, dict): # if _infer_input_from_dict returned a dict
+                    # This case should be rare if _infer_input_from_dict does its job
+                    logger.warning("_infer_input_from_dict 返回了一個字典，這不是預期的。")
+                    converted_batch[data_key] = None # Or handle error
+                else: # Not a tensor
+                    logger.warning(f"推斷的輸入數據不是張量，類型: {type(inputs_data)}")
+                    converted_batch[data_key] = None
+
+                converted_batch['targets'] = label_data
+                converted_batch['label'] = label_data # Also store as 'label' for consistency
+
+                # Move all tensor values in converted_batch to the device
+                for key, value in converted_batch.items():
+                    if isinstance(value, torch.Tensor):
+                        prepared_batch[key] = value.to(self.device)
+                    else: # If not a tensor (e.g. label_data was a list of numbers)
+                        # Attempt to convert to tensor, or log warning if not possible
+                        try:
+                            prepared_batch[key] = torch.tensor(value, device=self.device)
+                            logger.debug(f"鍵 '{key}' 的值不是張量 (類型: {type(value)})，已嘗試轉換為張量。")
+                        except Exception as e:
+                            logger.warning(f"無法將鍵 '{key}' 的值 (類型: {type(value)}) 轉換為張量並移動到設備: {e}")
+                            prepared_batch[key] = value # Store as is if conversion fails
+                
+                # Ensure essential keys are in prepared_batch
+                if 'inputs' not in prepared_batch: prepared_batch['inputs'] = None
+                if 'targets' not in prepared_batch: prepared_batch['targets'] = None
+                if 'label' not in prepared_batch: prepared_batch['label'] = prepared_batch.get('targets')
+
+                return prepared_batch
+            
+        elif isinstance(batch_input, dict):
+            current_batch_dict = batch_input.copy()
+            logger.debug(f"批次輸入是字典。原始鍵: {list(current_batch_dict.keys())}")
+
+            # 優先處理 'targets', 然後 'label', 然後 'score'
+            if current_batch_dict.get('targets') is None:
+                if current_batch_dict.get('label') is not None:
+                    current_batch_dict['targets'] = current_batch_dict['label']
+                    logger.debug("在 _prepare_batch 中 (字典模式), 'targets' 為 None 或不存在，已從 'label' 複製到 'targets'.")
+                elif current_batch_dict.get('score') is not None:
+                    current_batch_dict['targets'] = current_batch_dict['score']
+                    logger.debug("在 _prepare_batch 中 (字典模式), 'targets' 和 'label' 為 None 或不存在，已從 'score' 複製到 'targets'.")
             else:
-                prepared_batch[key] = value
+                logger.debug(f"批次字典中 'targets', 'label', 'score' 皆為 None 或不存在。可用鍵: {list(current_batch_dict.keys())}")
+                if 'targets' not in current_batch_dict: # 確保 'targets' 鍵存在，即使值為 None
+                    current_batch_dict['targets'] = None
+            
+            # 確保 'label' 鍵也存在且與 'targets' 一致（如果 'targets' 被設置了）
+            if current_batch_dict.get('label') is None:
+                if current_batch_dict.get('targets') is not None: # 如果 'targets' 已經被成功賦值
+                    current_batch_dict['label'] = current_batch_dict['targets']
+                    logger.debug("在 _prepare_batch 中 (字典模式), 'label' 為 None 或不存在，已從 'targets' 複製到 'label'.")
+                # 通常不需要再從 'score' 檢查 'label'
+
+            # 處理 'inputs'鍵
+            input_key_to_use = self._get_input_key(current_batch_dict) # 使用輔助函數獲取輸入鍵
+
+            if input_key_to_use and input_key_to_use in current_batch_dict:
+                current_batch_dict['inputs'] = current_batch_dict[input_key_to_use]
+                logger.debug(f"在 _prepare_batch 中 (字典模式), 已將 '{input_key_to_use}' 的值賦給 'inputs' 鍵。")
+            elif 'inputs' not in current_batch_dict: # 如果 'inputs' 仍然不存在
+                logger.warning("在 _prepare_batch 中 (字典模式)，無法確定主要的輸入鍵，且批次字典中也無 'inputs' 鍵。將 'inputs' 設為 None。")
+                current_batch_dict['inputs'] = None # 確保 'inputs' 鍵存在
+
+            # 將 current_batch_dict 中的所有張量移動到設備並填充 prepared_batch
+            # prepared_batch = {} # 已在函數開頭初始化
+            for key, value in current_batch_dict.items():
+                if isinstance(value, torch.Tensor):
+                    prepared_batch[key] = value.to(self.device)
+                else:
+                    prepared_batch[key] = value # 非張量值直接傳遞
+            
+            # 最後再次確保關鍵鍵存在於 prepared_batch 中
+            if 'inputs' not in prepared_batch:
+                prepared_batch['inputs'] = None
+                logger.debug("在 _prepare_batch (字典模式) 返回前, 'inputs' 為 None.")
+            if 'targets' not in prepared_batch:
+                prepared_batch['targets'] = None
+                logger.debug("在 _prepare_batch (字典模式) 返回前, 'targets' 為 None.")
+            if 'label' not in prepared_batch: # 如果 'label' 不在，嘗試從 'targets' 獲取
+                prepared_batch['label'] = prepared_batch.get('targets')
+                logger.debug(f"在 _prepare_batch (字典模式) 返回前, 'label' 從 'targets' 獲取，值為: {type(prepared_batch['label'])}")
+
+            logger.debug(f"_prepare_batch (字典模式) 返回的 prepared_batch 鍵: {list(prepared_batch.keys())}, "
+                         f"inputs type: {type(prepared_batch.get('inputs'))}, targets type: {type(prepared_batch.get('targets'))}, label type: {type(prepared_batch.get('label'))}")
         return prepared_batch
+
+
+
+    def _get_input_key(self, batch_dict: Dict[str, Any]) -> Optional[str]:
+        """
+        Determines the primary input key based on the structure of the batch.
+
+        Args:
+            batch_dict (Dict[str, Any]): The batch dictionary.
+
+        Returns:
+            Optional[str]: The primary input key if found, otherwise None.
+        """
+        # 檢查 'inputs' 鍵是否存在
+        if 'inputs' in batch_dict:
+            return 'inputs'
+        # 檢查 'data' 鍵是否存在
+        elif 'data' in batch_dict:
+            return 'data'
+        # 檢查 'feature' 鍵是否存在
+        elif 'feature' in batch_dict:
+            return 'feature'
+        # 檢查 'spectrogram' 鍵是否存在
+        elif 'spectrogram' in batch_dict:
+            return 'spectrogram'
+        # 檢查 'image' 鍵是否存在
+        elif 'image' in batch_dict:
+            return 'image'
+        # 檢查 'audio' 鍵是否存在
+        elif 'audio' in batch_dict:
+            return 'audio'
+        # 檢查 'input' 鍵是否存在
+        elif 'input' in batch_dict:
+            return 'input'
+        else:
+            logger.warning("未找到有效的輸入鍵。")
+            return None
 
     def _forward_pass(self, batch: Dict[str, Any]) -> torch.Tensor:
         """執行前向傳播
@@ -1197,75 +1684,8 @@ class PyTorchTrainer:
                 logger.warning(f"未知的損失函數類型: {loss_type}，使用默認的MSELoss")
                 return nn.MSELoss()
 
-    def evaluate(self, test_loader: Optional[DataLoader] = None) -> Dict[str, float]:
-        """評估模型性能
-        
-        Args:
-            test_loader: 測試數據加載器，如果不提供則使用訓練時的測試加載器
-            
-        Returns:
-            Dict[str, float]: 評估結果，包含損失和指標
-            
-        Description:
-            在測試集上評估模型性能
-        """
-        logger.info("開始評估模型...")
-        
-        if test_loader is None:
-            logger.warning("未提供測試加載器，無法執行評估")
-            return {'error': 'No test loader provided'}
-        
-        # 切換到評估模式
-        self.model.eval()
-        
-        total_loss = 0.0
-        all_metrics = {}
-        
-        with torch.no_grad():
-            for batch in tqdm(test_loader, desc="Evaluating"):
-                # 準備批次數據
-                batch = self._prepare_batch(batch)
-                
-                # 前向傳播
-                outputs = self._forward_pass(batch)
-                
-                # 計算損失
-                loss = self._compute_loss(outputs, batch)
-                total_loss += loss.item()
-                
-                # 計算指標
-                metrics = self._compute_metrics(outputs, batch)
-                
-                for metric_name, metric_value in metrics.items():
-                    if metric_name not in all_metrics:
-                        all_metrics[metric_name] = []
-                    all_metrics[metric_name].append(metric_value)
-        
-        # 計算平均損失和指標
-        avg_loss = total_loss / len(test_loader)
-        avg_metrics = {name: sum(values) / len(values) for name, values in all_metrics.items()}
-        
-        logger.info(f"評估完成 - 損失: {avg_loss:.4f}")
-        for name, value in avg_metrics.items():
-            logger.info(f"{name}: {value:.4f}")
-        
-        result = {'loss': avg_loss}
-        result.update(avg_metrics)
-        
-        return result 
-
     def _save_checkpoint(self, epoch: int, val_loss: float) -> str:
-        """保存檢查點
-        
-        Args:
-            epoch: 當前 epoch
-            val_loss: 驗證損失
-            
-        Returns:
-            str: 保存的檢查點路徑
-        """
-        # 使用 SaveManager 保存檢查點
-        return self.save_manager.save_checkpoint(
+        path = self.save_manager.save_checkpoint(
             model=self.model,
             optimizer=self.optimizer,
             epoch=epoch,
@@ -1277,18 +1697,16 @@ class PyTorchTrainer:
                 'metrics': self.metrics
             }
         )
+        self._log_experiment_metadata({
+            'event': 'checkpoint_saved_details',
+            'epoch': epoch,
+            'path': path,
+            'val_loss_at_checkpoint': val_loss,
+            'timestamp': datetime.now().isoformat()
+        })
+        return path
     
     def _save_best_model(self, epoch: int, val_loss: float) -> str:
-        """保存最佳模型
-        
-        Args:
-            epoch: 當前 epoch
-            val_loss: 驗證損失
-            
-        Returns:
-            str: 保存的模型路徑
-        """
-        # 使用 SaveManager 保存最佳模型
         save_path = self.save_manager.save_model(
             model=self.model,
             filename='best_model.pth',
@@ -1300,29 +1718,9 @@ class PyTorchTrainer:
                 'metrics': self.metrics
             }
         )
-        
-        # 保存模型結構信息
-        self._save_model_structure()
-        
+        self._save_model_structure() # 確保每次保存最佳模型時也更新結構信息
+        # 此處的 metadata logging 移到 train 循環中，以確保 metric_name 和 value 可用
         return save_path
-        
-    def _save_model_structure(self) -> str:
-        """保存模型結構信息
-        
-        Returns:
-            str: 保存的結構信息路徑
-        """
-        # 獲取模型結構信息
-        model_structure = ModelStructureInfo(self.model)
-        structure_dict = model_structure.get_structure_dict()
-        
-        # 保存模型結構信息到 JSON 文件
-        structure_path = os.path.join(self.output_dir, 'model_structure.json')
-        with open(structure_path, 'w') as f:
-            json.dump(structure_dict, f, indent=2)
-            
-        logger.info(f"模型結構信息已保存到 {structure_path}")
-        return structure_path 
 
     def _log_experiment_metadata(self, meta: Dict[str, Any]):
         """將metadata寫入 experiments.log
@@ -1335,12 +1733,37 @@ class PyTorchTrainer:
         References:
             無
         """
-        # 中文註解：確保logs目錄存在
+        
+        def make_serializable(obj):
+            """遞歸地將對象轉換為JSON可序列化格式"""
+            if isinstance(obj, dict):
+                return {k: make_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [make_serializable(i) for i in obj]
+            elif isinstance(obj, torch.Tensor):
+                if obj.numel() == 1:
+                    return obj.item() # 單元素張量轉為標量
+                return obj.tolist() # 多元素張量轉為列表
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist() # Numpy 數組轉為列表
+            elif isinstance(obj, (np.float32, np.float64, np.int32, np.int64)):
+                 return obj.item() # Numpy 標量類型轉為 Python 原生類型
+            # 可以根據需要添加更多類型轉換，例如 datetime 等
+            elif isinstance(obj, datetime):
+                return obj.isoformat()
+            return obj
+
+        serializable_meta = make_serializable(meta)
+
         logs_dir = self.save_manager.get_path('logs', '')
         os.makedirs(logs_dir, exist_ok=True)
         log_path = os.path.join(logs_dir, 'experiments.log')
-        with open(log_path, 'a') as f:
-            f.write(json.dumps(meta, ensure_ascii=False) + '\n') 
+        try:
+            with open(log_path, 'a') as f:
+                f.write(json.dumps(serializable_meta, ensure_ascii=False) + '\n') 
+        except Exception as e:
+            logger.error(f"寫入 experiments.log 時出錯: {e}")
+            logger.error(f"未能序列化的元數據 (部分): {str(serializable_meta)[:500]}") # 打印部分數據以幫助調試
 
 # 中文註解：這是pytorch_trainer.py的Minimal Executable Unit，檢查PyTorchTrainer能否正確初始化與執行train流程，並測試錯誤配置時的優雅報錯
 if __name__ == "__main__":

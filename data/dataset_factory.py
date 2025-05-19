@@ -39,7 +39,7 @@ class DatasetFactory:
         
         # 檢查是否使用索引CSV
         use_index = data_config.get('use_index', False)
-        index_path = data_config.get('index_path', 'data/data_index.csv')
+        index_path = data_config.get('index_path', 'data/metadata/data_index.csv')
         
         if use_index and os.path.exists(index_path):
             logger.info(f"使用索引CSV: {index_path}")
@@ -70,7 +70,7 @@ class DatasetFactory:
         """
         data_config = config['data']
         data_type = data_config.get('type', 'audio')
-        index_path = data_config.get('index_path', 'data/data_index.csv')
+        index_path = data_config.get('index_path', 'data/metadata/data_index.csv')
         label_field = data_config.get('label_field', 'score')
         
         # 獲取數據加載參數
@@ -78,119 +78,105 @@ class DatasetFactory:
         sample_rate = audio_config.get('sample_rate', 16000)
         duration = audio_config.get('duration', 5.0)
         
-        # 設置分割條件
-        splits = data_config.get('splits', {})
-        train_filter = {'split': 'train'} if 'split' in data_config.get('filter_criteria', {}) else {}
-        val_filter = {'split': 'val'} if 'split' in data_config.get('filter_criteria', {}) else {}
-        test_filter = {'split': 'test'} if 'split' in data_config.get('filter_criteria', {}) else {}
-        
-        # 添加通用過濾條件
-        common_filters = {k: v for k, v in data_config.get('filter_criteria', {}).items() if k != 'split'}
-        train_filter.update(common_filters)
-        val_filter.update(common_filters)
-        test_filter.update(common_filters)
-        
+        # 獲取通用過濾條件
+        filter_criteria = data_config.get('filter_criteria', {})
         transforms = data_config.get('transforms', {})
+        splits = data_config.get('splits', {})
+        split_by_patient = splits.get('split_by_patient', True)
+        split_by_label = splits.get('split_by_label', False)
         
-        # 根據數據類型創建數據集
+        # split_by_label 優先級高於 split_by_patient
+        if split_by_label:
+            split_by_patient = False
+            logger.info("啟用按標籤拆分數據集，將停用按患者ID拆分")
+
+        # 根據數據類型創建完整數據集
         if data_type == 'audio':
             from data.audio_dataset import AudioDataset
             
-            train_dataset = AudioDataset(
+            # 創建完整數據集
+            full_dataset = AudioDataset(
                 index_path=index_path,
                 label_field=label_field,
-                filter_criteria=train_filter,
+                filter_criteria=filter_criteria,
                 sample_rate=sample_rate,
                 duration=duration,
                 transform=transforms.get('train', {}),
                 is_train=True
             )
             
-            val_dataset = AudioDataset(
-                index_path=index_path,
-                label_field=label_field,
-                filter_criteria=val_filter,
-                sample_rate=sample_rate,
-                duration=duration,
-                transform=transforms.get('val', {}),
-                is_train=False
-            )
-            
-            test_dataset = AudioDataset(
-                index_path=index_path,
-                label_field=label_field,
-                filter_criteria=test_filter,
-                sample_rate=sample_rate,
-                duration=duration,
-                transform=transforms.get('test', {}),
-                is_train=False
-            )
-            
         elif data_type == 'spectrogram':
             from data.spectrogram_dataset import SpectrogramDataset
             
-            # 獲取頻譜圖參數
-            spec_config = data_config.get('preprocessing', {}).get('spectrogram', {})
-            
-            train_dataset = SpectrogramDataset(
+            # 創建完整數據集
+            full_dataset = SpectrogramDataset(
                 index_path=index_path,
                 label_field=label_field,
-                filter_criteria=train_filter,
+                filter_criteria=filter_criteria,
                 transform=transforms.get('train', {}),
                 is_train=True,
-                config=config
-            )
-            
-            val_dataset = SpectrogramDataset(
-                index_path=index_path,
-                label_field=label_field,
-                filter_criteria=val_filter,
-                transform=transforms.get('val', {}),
-                is_train=False,
-                config=config
-            )
-            
-            test_dataset = SpectrogramDataset(
-                index_path=index_path,
-                label_field=label_field,
-                filter_criteria=test_filter,
-                transform=transforms.get('test', {}),
-                is_train=False,
                 config=config
             )
             
         elif data_type == 'feature':
             from data.feature_dataset import FeatureDataset
             
-            train_dataset = FeatureDataset(
+            # 創建完整數據集
+            full_dataset = FeatureDataset(
                 index_path=index_path,
                 label_field=label_field,
-                filter_criteria=train_filter,
+                filter_criteria=filter_criteria,
                 transform=transforms.get('train', {}),
                 is_train=True,
-                config=config
-            )
-            
-            val_dataset = FeatureDataset(
-                index_path=index_path,
-                label_field=label_field,
-                filter_criteria=val_filter,
-                transform=transforms.get('val', {}),
-                is_train=False,
-                config=config
-            )
-            
-            test_dataset = FeatureDataset(
-                index_path=index_path,
-                label_field=label_field,
-                filter_criteria=test_filter,
-                transform=transforms.get('test', {}),
-                is_train=False,
                 config=config
             )
         
         else:
             raise ValueError(f"不支持的數據類型: {data_type}")
+        
+        # 使用 split_by_label 方法拆分數據集
+        if split_by_label and hasattr(full_dataset, 'split_by_label'):
+            logger.info("按標籤拆分數據集")
+            train_ratio = splits.get('train_ratio', 0.7)
+            val_ratio = splits.get('val_ratio', 0.15)
+            test_ratio = splits.get('test_ratio', 0.15)
+            split_seed = splits.get('split_seed', 42)
+            
+            train_indices, val_indices, test_indices = full_dataset.split_by_label(
+                train_ratio=train_ratio,
+                val_ratio=val_ratio,
+                test_ratio=test_ratio,
+                seed=split_seed
+            )
+            
+            from torch.utils.data import Subset
+            
+            train_dataset = Subset(full_dataset, train_indices)
+            val_dataset = Subset(full_dataset, val_indices)
+            test_dataset = Subset(full_dataset, test_indices)
+        # 使用 split_by_patient 方法拆分數據集
+        elif split_by_patient and hasattr(full_dataset, 'split_by_patient'):
+            logger.info("按患者 ID 拆分數據集")
+            train_ratio = splits.get('train_ratio', 0.7)
+            val_ratio = splits.get('val_ratio', 0.15)
+            test_ratio = splits.get('test_ratio', 0.15)
+            split_seed = splits.get('split_seed', 42)
+            
+            train_indices, val_indices, test_indices = full_dataset.split_by_patient(
+                train_ratio=train_ratio,
+                val_ratio=val_ratio,
+                test_ratio=test_ratio,
+                seed=split_seed
+            )
+            
+            from torch.utils.data import Subset
+            
+            train_dataset = Subset(full_dataset, train_indices)
+            val_dataset = Subset(full_dataset, val_indices)
+            test_dataset = Subset(full_dataset, test_indices)
+        else:
+            # 如果不需要或無法按特定方式拆分，則使用隨機拆分
+            train_dataset, val_dataset, test_dataset = DatasetFactory._split_dataset(full_dataset, config)
         
         logger.info(f"使用索引模式創建數據集 - 訓練: {len(train_dataset)}，驗證: {len(val_dataset)}，測試: {len(test_dataset)}")
         
@@ -319,10 +305,28 @@ class DatasetFactory:
         val_size = int(dataset_size * val_ratio)
         test_size = dataset_size - train_size - val_size
         
-        # 檢查是否按患者 ID 拆分
+        # 檢查是否按患者 ID 或按標籤拆分
         split_by_patient = splits.get('split_by_patient', True)
+        split_by_label = splits.get('split_by_label', False)
         
-        if hasattr(dataset, 'split_by_patient') and split_by_patient:
+        # split_by_label 優先級高於 split_by_patient
+        if split_by_label:
+            split_by_patient = False
+            logger.info("啟用按標籤拆分數據集，將停用按患者ID拆分")
+        
+        if hasattr(dataset, 'split_by_label') and split_by_label:
+            logger.info("按標籤拆分數據集")
+            train_indices, val_indices, test_indices = dataset.split_by_label(
+                train_ratio=train_ratio,
+                val_ratio=val_ratio,
+                test_ratio=test_ratio,
+                seed=splits.get('split_seed', 42)
+            )
+            
+            train_dataset = Subset(dataset, train_indices)
+            val_dataset = Subset(dataset, val_indices)
+            test_dataset = Subset(dataset, test_indices)
+        elif hasattr(dataset, 'split_by_patient') and split_by_patient:
             logger.info("按患者 ID 拆分數據集")
             train_indices, val_indices, test_indices = dataset.split_by_patient(
                 train_ratio=train_ratio,
@@ -530,7 +534,7 @@ if __name__ == "__main__":
     
     finally:
         # 清理測試文件
-        os.unlink(test_csv_path)
+        os.unlink(test_csv_path) 
 
 # 提供模組級別的函數，以便其他模組可以直接導入
 def create_dataset(config: Dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:

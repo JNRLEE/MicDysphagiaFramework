@@ -170,6 +170,14 @@ class HuberLossWrapper(nn.HuberLoss):
 
 # 其他需要的標準PyTorch損失函數可以在這裡註冊...
 
+# 註冊加權損失函數
+from .weighted_losses import WeightedCrossEntropyLoss
+
+@LossFactory.register_loss("WeightedCrossEntropyLoss")
+class WeightedCrossEntropyLossWrapper(WeightedCrossEntropyLoss):
+    """加權交叉熵損失函數的包裝器，適用於不平衡分類問題"""
+    pass
+
 # 中文註解：這是loss_factory.py的Minimal Executable Unit，檢查LossFactory能否正確創建損失函數，並測試錯誤type時的優雅報錯
 if __name__ == "__main__":
     """
@@ -200,7 +208,7 @@ if __name__ == "__main__":
         config = {"type": "NotExistLoss", "parameters": {}}
         loss_fn = LossFactory.get_loss(config)
     except Exception as e:
-        print(f"遇到錯誤type時的報錯（預期行為）: {e}")
+        print(f"遇到錯誤type時的報錯（預期行為）: {e}") 
 
 # 提供模組級別的函數，以便其他模組可以直接導入
 def create_loss_function(config: Dict[str, Any]) -> nn.Module:

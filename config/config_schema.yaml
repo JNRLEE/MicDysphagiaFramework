@@ -13,17 +13,11 @@ data:
   
   # 新增索引CSV支持
   use_index: false  # 是否使用索引CSV加載數據
-  index_path: 'data/data_index.csv'  # 索引CSV文件路徑
+  index_path: 'data/metadata/data_index.csv'  # 索引CSV文件路徑
   label_field: 'score'  # 標籤欄位名稱，'score', 'DrLee_Evaluation', 'DrTai_Evaluation', 'selection'
   filter_criteria:  # 篩選條件
     status: null  # 數據處理狀態，'raw', 'processed', 'failed'，或null表示不篩選
     selection: null  # 錄音時的動作類型，如'乾吞嚥1口'，或null表示不篩選
-  
-  # 數據源
-  source:
-    wav_dir: 'data/raw'  # 音頻文件目錄
-    spectrogram_dir: 'data/spectrograms'  # 頻譜圖目錄
-    feature_dir: 'data/features'  # 特徵向量目錄
   
   # 數據預處理
   preprocessing:

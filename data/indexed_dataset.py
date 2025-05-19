@@ -211,7 +211,7 @@ class IndexedDatasetBase(Dataset):
         return self.label_map
     
     def split_by_patient(self, train_ratio: float = 0.7, val_ratio: float = 0.15, test_ratio: float = 0.15, seed: int = 42) -> Tuple[List[int], List[int], List[int]]:
-        """按照患者ID拆分數據為訓練、驗證和測試集
+        """按照患者ID拆分數據為訓練、驗證和測試集，確保N開頭和P開頭的患者ID在各集合中均勻分佈
         
         Args:
             train_ratio: 訓練集比例
@@ -226,16 +226,200 @@ class IndexedDatasetBase(Dataset):
             logger.warning("直接加載模式不支持按患者ID拆分，將使用隨機拆分")
             return None, None, None
         
-        if not self.index_loader:
-            logger.warning("索引加載器未初始化，無法按患者ID拆分")
+        if not self.index_loader or self.data_df is None:
+            logger.warning("索引加載器未初始化或數據為空，無法按患者ID拆分")
             return None, None, None
         
-        return self.index_loader.split_by_patient(
-            train_ratio=train_ratio,
-            val_ratio=val_ratio,
-            test_ratio=test_ratio,
-            seed=seed
-        )
+        # 檢查是否有患者ID欄位
+        if 'patient_id' not in self.data_df.columns:
+            logger.warning("數據索引中不存在patient_id欄位，無法按患者ID拆分")
+            return None, None, None
+        
+        # 在已過濾的數據上進行拆分
+        import random
+        random.seed(seed)
+        
+        # 獲取唯一的患者ID
+        patient_ids = self.data_df['patient_id'].unique()
+        
+        # 分別處理N開頭和P開頭的患者ID
+        n_prefixed_patients = [pid for pid in patient_ids if pid.startswith('N')]
+        p_prefixed_patients = [pid for pid in patient_ids if pid.startswith('P')]
+        other_patients = [pid for pid in patient_ids if not (pid.startswith('N') or pid.startswith('P'))]
+        
+        # 打亂各組患者ID
+        random.shuffle(n_prefixed_patients)
+        random.shuffle(p_prefixed_patients)
+        random.shuffle(other_patients)
+        
+        logger.info(f"患者ID分佈: N開頭 {len(n_prefixed_patients)} 位, P開頭 {len(p_prefixed_patients)} 位, 其他 {len(other_patients)} 位")
+        
+        # 為每組計算分割點
+        n_train_size = int(len(n_prefixed_patients) * train_ratio)
+        n_val_size = int(len(n_prefixed_patients) * val_ratio)
+        
+        p_train_size = int(len(p_prefixed_patients) * train_ratio)
+        p_val_size = int(len(p_prefixed_patients) * val_ratio)
+        
+        other_train_size = int(len(other_patients) * train_ratio)
+        other_val_size = int(len(other_patients) * val_ratio)
+        
+        # 分割各組患者ID
+        n_train = n_prefixed_patients[:n_train_size]
+        n_val = n_prefixed_patients[n_train_size:n_train_size+n_val_size]
+        n_test = n_prefixed_patients[n_train_size+n_val_size:]
+        
+        p_train = p_prefixed_patients[:p_train_size]
+        p_val = p_prefixed_patients[p_train_size:p_train_size+p_val_size]
+        p_test = p_prefixed_patients[p_train_size+p_val_size:]
+        
+        other_train = other_patients[:other_train_size]
+        other_val = other_patients[other_train_size:other_train_size+other_val_size]
+        other_test = other_patients[other_train_size+other_val_size:]
+        
+        # 合併各組患者ID
+        train_patients = n_train + p_train + other_train
+        val_patients = n_val + p_val + other_val
+        test_patients = n_test + p_test + other_test
+        
+        # 記錄各集合的患者ID分佈
+        logger.info(f"訓練集患者ID分佈: N開頭 {len(n_train)} 位, P開頭 {len(p_train)} 位, 其他 {len(other_train)} 位")
+        logger.info(f"驗證集患者ID分佈: N開頭 {len(n_val)} 位, P開頭 {len(p_val)} 位, 其他 {len(other_val)} 位")
+        logger.info(f"測試集患者ID分佈: N開頭 {len(n_test)} 位, P開頭 {len(p_test)} 位, 其他 {len(other_test)} 位")
+        
+        # 獲取每個集合的文件索引（注意：這是在self.data_df中的索引，不是原始索引）
+        train_indices = self.data_df[self.data_df['patient_id'].isin(train_patients)].index.tolist()
+        val_indices = self.data_df[self.data_df['patient_id'].isin(val_patients)].index.tolist()
+        test_indices = self.data_df[self.data_df['patient_id'].isin(test_patients)].index.tolist()
+        
+        logger.info(f"按患者ID拆分數據: 訓練集 {len(train_indices)} 個文件，驗證集 {len(val_indices)} 個文件，測試集 {len(test_indices)} 個文件")
+        
+        return train_indices, val_indices, test_indices
+    
+    def split_by_label(self, train_ratio: float = 0.7, val_ratio: float = 0.15, test_ratio: float = 0.15, seed: int = 42) -> Tuple[List[int], List[int], List[int]]:
+        """按照標籤均勻拆分數據為訓練、驗證和測試集，確保各個標籤類別在各集合中均勻分佈
+        
+        Args:
+            train_ratio: 訓練集比例
+            val_ratio: 驗證集比例
+            test_ratio: 測試集比例
+            seed: 隨機種子
+            
+        Returns:
+            Tuple[List[int], List[int], List[int]]: (訓練集索引, 驗證集索引, 測試集索引)
+        """
+        if self.is_direct_mode:
+            logger.warning("直接加載模式不支持按標籤拆分，將使用隨機拆分")
+            return None, None, None
+        
+        if not self.index_loader or self.data_df is None or self.labels is None:
+            logger.warning("索引加載器未初始化或數據為空，無法按標籤拆分")
+            return None, None, None
+        
+        # 確保比例總和約等於 1
+        total = train_ratio + val_ratio + test_ratio
+        if not np.isclose(total, 1.0):
+            logger.warning(f"拆分比例之和 ({total}) 不為 1，將重新歸一化。")
+            train_ratio /= total
+            val_ratio /= total
+            test_ratio /= total
+        
+        import random
+        random.seed(seed)
+        np.random.seed(seed)
+        
+        # 對於分類任務，按類別進行分層抽樣
+        if self.is_classification:
+            # 獲取唯一標籤及其索引
+            unique_labels = np.unique(self.labels)
+            label_indices = {label: np.where(self.labels == label)[0] for label in unique_labels}
+            
+            # 記錄各類別的樣本數量
+            label_counts = {label: len(indices) for label, indices in label_indices.items()}
+            logger.info(f"標籤分佈: {label_counts}")
+            
+            # 初始化各集合的索引
+            train_indices = []
+            val_indices = []
+            test_indices = []
+            
+            # 對每個類別進行分層抽樣
+            for label, indices in label_indices.items():
+                # 打亂該類別的索引
+                np.random.shuffle(indices)
+                
+                # 計算分割點
+                n_total = len(indices)
+                n_train = int(n_total * train_ratio)
+                n_val = int(n_total * val_ratio)
+                
+                # 分割該類別的索引
+                label_train = indices[:n_train].tolist()
+                label_val = indices[n_train:n_train+n_val].tolist()
+                label_test = indices[n_train+n_val:].tolist()
+                
+                # 添加到各集合
+                train_indices.extend(label_train)
+                val_indices.extend(label_val)
+                test_indices.extend(label_test)
+                
+                # 記錄各集合的該類別樣本數
+                logger.info(f"標籤 {label} 分佈: 訓練集 {len(label_train)} 個樣本，驗證集 {len(label_val)} 個樣本，測試集 {len(label_test)} 個樣本")
+        
+        # 對於回歸任務，使用分層k-fold交叉驗證
+        else:
+            # 將連續標籤分成若干桶進行分層
+            num_bins = min(10, len(self.labels) // 10)  # 至少10個樣本一個桶
+            if num_bins < 2:
+                num_bins = 2  # 至少分成2個桶
+                
+            # 將標籤按大小排序並分桶
+            sorted_indices = np.argsort(self.labels)
+            bin_size = len(sorted_indices) // num_bins
+            
+            # 初始化各集合的索引
+            train_indices = []
+            val_indices = []
+            test_indices = []
+            
+            logger.info(f"回歸任務: 將連續標籤分成 {num_bins} 個桶進行分層抽樣")
+            
+            # 對每個桶進行分層抽樣
+            for i in range(num_bins):
+                start_idx = i * bin_size
+                end_idx = (i + 1) * bin_size if i < num_bins - 1 else len(sorted_indices)
+                bin_indices = sorted_indices[start_idx:end_idx]
+                
+                # 打亂該桶的索引
+                np.random.shuffle(bin_indices)
+                
+                # 計算分割點
+                n_total = len(bin_indices)
+                n_train = int(n_total * train_ratio)
+                n_val = int(n_total * val_ratio)
+                
+                # 分割該桶的索引
+                bin_train = bin_indices[:n_train].tolist()
+                bin_val = bin_indices[n_train:n_train+n_val].tolist()
+                bin_test = bin_indices[n_train+n_val:].tolist()
+                
+                # 添加到各集合
+                train_indices.extend(bin_train)
+                val_indices.extend(bin_val)
+                test_indices.extend(bin_test)
+                
+                min_label = self.labels[bin_indices[0]]
+                max_label = self.labels[bin_indices[-1]]
+                logger.info(f"標籤桶 {i+1} [{min_label:.2f}-{max_label:.2f}]: 訓練集 {len(bin_train)} 個樣本，驗證集 {len(bin_val)} 個樣本，測試集 {len(bin_test)} 個樣本")
+        
+        # 打亂各集合的索引順序（可選）
+        random.shuffle(train_indices)
+        random.shuffle(val_indices)
+        random.shuffle(test_indices)
+        
+        logger.info(f"按標籤拆分數據: 訓練集 {len(train_indices)} 個樣本，驗證集 {len(val_indices)} 個樣本，測試集 {len(test_indices)} 個樣本")
+        
+        return train_indices, val_indices, test_indices
     
     @property
     def is_classification(self) -> bool:

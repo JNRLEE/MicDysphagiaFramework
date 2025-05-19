@@ -1,0 +1,7 @@
+執行過程中出錯: 'tuple' object has no attribute 'keys'
+Traceback (most recent call last):
+  File "/home/sbplab/JNRLEE/MicDysphagiaFramework/tests/test_swin_transformer_inputs.py", line 385, in main
+    batch, indices = get_sample_batch(config)
+  File "/home/sbplab/JNRLEE/MicDysphagiaFramework/tests/test_swin_transformer_inputs.py", line 124, in get_sample_batch
+    for key in samples[0].keys():
+AttributeError: 'tuple' object has no attribute 'keys'
